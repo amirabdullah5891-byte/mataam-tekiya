@@ -1,6 +1,6 @@
-// مساعد للتحقق من الجلسة في API routes باستخدام JWT token
-import { getToken } from 'next-auth/jwt'
-import type { NextRequest } from 'next/server'
+// مساعد للتحقق من الجلسة في API routes
+// نقرأ JWT token من cookie ونفك تشفيره يدويًا لتفادي مشاكل getToken مع NextRequest
+import { decode } from 'next-auth/jwt'
 import { db } from './db'
 
 export type SessionUser = {
@@ -10,12 +10,37 @@ export type SessionUser = {
   role: string
 }
 
-export async function getSessionUser(request: NextRequest | Request): Promise<SessionUser | null> {
+// قراءة قيمة cookie من headers
+function getCookie(request: Request, name: string): string | undefined {
+  const cookieHeader = request.headers.get('cookie') || ''
+  const cookies = cookieHeader.split(';')
+  for (const c of cookies) {
+    const [k, ...v] = c.trim().split('=')
+    if (k === name) {
+      return decodeURIComponent(v.join('='))
+    }
+  }
+  return undefined
+}
+
+export async function getSessionUser(request: Request): Promise<SessionUser | null> {
   try {
-    const token = await getToken({
-      req: request as any,
-      secret: process.env.NEXTAUTH_SECRET,
+    const secret = process.env.NEXTAUTH_SECRET
+    if (!secret) return null
+
+    // نحاول أولاً الـ cookie العادي، ثم الـ secure cookie
+    const sessionCookie =
+      getCookie(request, 'next-auth.session-token') ||
+      getCookie(request, '__Secure-next-auth.session-token')
+
+    if (!sessionCookie) return null
+
+    // فك تشفير الـ JWT
+    const token = await decode({
+      token: sessionCookie,
+      secret,
     })
+
     if (!token?.id) return null
 
     const user = await db.user.findUnique({
@@ -37,7 +62,8 @@ export async function getSessionUser(request: NextRequest | Request): Promise<Se
       name: user.name,
       role: user.role,
     }
-  } catch {
+  } catch (e) {
+    console.error('getSessionUser error:', e)
     return null
   }
 }

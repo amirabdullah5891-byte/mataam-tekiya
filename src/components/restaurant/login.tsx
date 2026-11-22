@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
 import {
   Utensils, User, Lock, Loader2, LogIn, MapPin, Phone,
   AlertCircle, KeyRound, UserPlus,
@@ -20,7 +19,6 @@ import { toast } from 'sonner'
 import { RESTAURANT_INFO } from '@/lib/restaurant'
 
 export default function LoginClient({ needsSetup }: { needsSetup: boolean }) {
-  const router = useRouter()
   const [tab, setTab] = useState<'login' | 'setup'>(needsSetup ? 'setup' : 'login')
 
   // حقول تسجيل الدخول
@@ -52,7 +50,10 @@ export default function LoginClient({ needsSetup }: { needsSetup: boolean }) {
         toast.error('اسم المستخدم أو كلمة المرور غير صحيحة')
       } else {
         toast.success('تم تسجيل الدخول بنجاح')
-        router.refresh()
+        // إعادة تحميل كاملة للصفحة لقراءة الجلسة الجديدة
+        setTimeout(() => {
+          window.location.href = '/'
+        }, 300)
       }
     } catch {
       toast.error('حدث خطأ، حاول مرة أخرى')
@@ -98,7 +99,10 @@ export default function LoginClient({ needsSetup }: { needsSetup: boolean }) {
         redirect: false,
       })
       if (result && !result.error) {
-        router.refresh()
+        // إعادة تحميل كاملة للصفحة لقراءة الجلسة الجديدة
+        setTimeout(() => {
+          window.location.href = '/'
+        }, 300)
       } else {
         setTab('login')
       }

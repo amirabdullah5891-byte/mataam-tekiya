@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { signOut } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
 import {
   LayoutDashboard, Receipt, ShoppingCart, Boxes, Wallet,
   Truck, BarChart3, Users, Utensils, LogOut, Menu, ChevronLeft,
@@ -170,12 +169,14 @@ function SidebarContent({ user, tab, onSelectTab, onSignOut }: SidebarContentPro
 export default function AppClient({ user }: { user: AppUser }) {
   const [tab, setTab] = useState<Tab>('dashboard')
   const [mobileOpen, setMobileOpen] = useState(false)
-  const router = useRouter()
 
   const handleSignOut = async () => {
     await signOut({ redirect: false })
     toast.success('تم تسجيل الخروج')
-    router.refresh()
+    // إعادة تحميل كاملة للصفحة لمسح الجلسة
+    setTimeout(() => {
+      window.location.href = '/'
+    }, 300)
   }
 
   const handleSelectTab = (newTab: Tab) => {
