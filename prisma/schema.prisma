@@ -22,9 +22,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  expenses  Expense[]
-  purchases Purchase[]
-  invoices  Invoice[]
+  expenses           Expense[]
+  purchases          Purchase[]
+  invoices           Invoice[]
+  walletTopups       WalletTransaction[]
+  acceptedOrders     CustomerOrder[]
 }
 
 // عناصر قائمة الطعام - الأطباق والمشروبات المتاحة للبيع
@@ -35,10 +37,14 @@ model MenuItem {
   price       Float
   cost        Float          @default(0)
   isActive    Boolean        @default(true)
+  isAvailable Boolean        @default(true) // متاح حالياً (نفد من المخزون مؤقتاً)
   description String?
+  imageUrl    String?        // رابط صورة الطبق
+  prepTime   Int?            // وقت التحضير بالدقائق
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   invoiceItems InvoiceItem[]
+  orderItems  CustomerOrderItem[]
 }
 
 // الفاتورة - تمثل عملية بيع واحدة
@@ -187,4 +193,85 @@ model Expense {
 
   @@index([date])
   @@index([category])
+}
+
+// الزبائن - أصحاب المحافظ الرقمية
+model Customer {
+  id        String             @id @default(cuid())
+  phone     String             @unique // رقم الهاتف هو المعرف الرئيسي
+  name      String?
+  balance   Float              @default(0) // رصيد المحفظة بالجنيه
+  isActive  Boolean            @default(true)
+  notes     String?
+  orders    CustomerOrder[]
+  walletTransactions WalletTransaction[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([phone])
+}
+
+// معاملات المحفظة - شحن، دفع، استرجاع
+model WalletTransaction {
+  id          String    @id @default(cuid())
+  customerId  String
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  type        String    // topup (شحن), payment (دفع طلب), refund (استرجاع), adjustment (تسوية)
+  amount      Float     // المبلغ (موجب للشحن، سالب للدفع)
+  balanceBefore Float
+  balanceAfter  Float
+  description String?
+  reference   String?  // رقم الطلب المرتبط
+  createdById String?  // المستخدم الذي قام بالعملية (للشحن يدوياً)
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([customerId])
+  @@index([createdAt])
+  @@index([type])
+}
+
+// طلبات الزبائن - الطلبات المرسلة عبر واجهة المنيو
+model CustomerOrder {
+  id              String              @id @default(cuid())
+  orderNumber     String              @unique
+  customerId      String?
+  customer        Customer?           @relation(fields: [customerId], references: [id])
+  customerName    String?             // اسم الزبون (قد لا يكون مسجلاً)
+  customerPhone   String?             // هاتف الزبون
+  tableNumber     String?             // رقم الطاولة
+  items           CustomerOrderItem[]
+  subtotal        Float               @default(0)
+  deliveryFee     Float               @default(0)
+  total           Float               @default(0)
+  paymentMethod   String              @default("cash") // cash, wallet
+  status          String              @default("pending") // pending, confirmed, preparing, ready, completed, cancelled
+  notes           String?
+  acceptedById    String?
+  acceptedBy      User?               @relation(fields: [acceptedById], references: [id])
+  acceptedAt      DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([customerPhone])
+}
+
+// بنود طلب الزبون
+model CustomerOrderItem {
+  id          String        @id @default(cuid())
+  orderId     String
+  order       CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId  String?
+  menuItem    MenuItem?     @relation(fields: [menuItemId], references: [id])
+  name        String
+  quantity    Int           @default(1)
+  price       Float
+  total       Float         @default(0)
+  notes       String?       // ملاحظات على البند (بدون بصل، حار، إلخ)
+
+  @@index([orderId])
+  @@index([menuItemId])
 }

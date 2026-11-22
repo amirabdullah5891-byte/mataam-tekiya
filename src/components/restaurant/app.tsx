@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { signOut } from 'next-auth/react'
 import {
   LayoutDashboard, Receipt, ShoppingCart, Boxes, Wallet,
-  Truck, BarChart3, Users, Utensils, LogOut, Menu, ChevronLeft,
+  Truck, BarChart3, Users, Utensils, LogOut, Menu, ChevronLeft, Bell, QrCode,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -22,6 +22,8 @@ import Expenses from './expenses'
 import Suppliers from './suppliers'
 import Reports from './reports'
 import UsersManagement from './users'
+import CustomerOrders from './customer-orders'
+import CustomersManagement from './customers'
 
 export type AppUser = {
   id: string
@@ -39,6 +41,8 @@ type Tab =
   | 'suppliers'
   | 'reports'
   | 'users'
+  | 'customerOrders'
+  | 'customers'
 
 const NAV_SECTIONS: {
   title: string
@@ -53,6 +57,7 @@ const NAV_SECTIONS: {
     title: 'العمليات اليومية',
     items: [
       { id: 'dashboard', label: 'لوحة المعلومات', icon: <LayoutDashboard className="h-5 w-5" /> },
+      { id: 'customerOrders', label: 'طلبات الزبائن', icon: <Bell className="h-5 w-5" /> },
       { id: 'invoices', label: 'الفواتير', icon: <Receipt className="h-5 w-5" /> },
       { id: 'purchases', label: 'المشتريات', icon: <ShoppingCart className="h-5 w-5" /> },
     ],
@@ -60,6 +65,7 @@ const NAV_SECTIONS: {
   {
     title: 'الإدارة',
     items: [
+      { id: 'customers', label: 'المحافظ الرقمية', icon: <Wallet className="h-5 w-5" /> },
       { id: 'inventory', label: 'المخزون', icon: <Boxes className="h-5 w-5" /> },
       { id: 'suppliers', label: 'الموردون', icon: <Truck className="h-5 w-5" /> },
       { id: 'expenses', label: 'المصروفات', icon: <Wallet className="h-5 w-5" /> },
@@ -107,6 +113,33 @@ function SidebarContent({ user, tab, onSelectTab, onSignOut }: SidebarContentPro
 
       {/* روابط التنقل */}
       <nav className="flex-1 overflow-y-auto p-3 space-y-4">
+        {/* روابط العموم */}
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-2">
+            واجهة الزبون
+          </p>
+          <div className="space-y-1">
+            <a
+              href="/menu"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-right text-muted-foreground hover:text-foreground hover:bg-muted"
+            >
+              <Utensils className="h-5 w-5" />
+              <span className="flex-1">عرض المنيو</span>
+            </a>
+            <a
+              href="/qrcode"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-right text-muted-foreground hover:text-foreground hover:bg-muted"
+            >
+              <QrCode className="h-5 w-5" />
+              <span className="flex-1">طباعة QR Code</span>
+            </a>
+          </div>
+        </div>
+
         {NAV_SECTIONS.map(section => {
           const visibleItems = section.items.filter(
             item => !item.adminOnly || user.role === 'admin'
@@ -224,8 +257,10 @@ export default function AppClient({ user }: { user: AppUser }) {
         <main className="flex-1 overflow-x-hidden p-4 lg:p-6">
           <div className="max-w-7xl mx-auto">
             {tab === 'dashboard' && <Dashboard user={user} />}
+            {tab === 'customerOrders' && <CustomerOrders user={user} />}
             {tab === 'invoices' && <Invoices user={user} />}
             {tab === 'purchases' && <Purchases user={user} />}
+            {tab === 'customers' && <CustomersManagement user={user} />}
             {tab === 'inventory' && <Inventory user={user} />}
             {tab === 'expenses' && <Expenses user={user} />}
             {tab === 'suppliers' && <Suppliers user={user} />}
