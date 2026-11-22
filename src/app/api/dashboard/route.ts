@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getSessionUser, unauthorizedResponse } from '@/lib/session'
 
 // GET /api/dashboard - إحصائيات لوحة المعلومات
 export async function GET(request: NextRequest) {
   try {
+    const user = await getSessionUser(request)
+    if (!user) return unauthorizedResponse()
+
     const { searchParams } = new URL(request.url)
-    const range = searchParams.get('range') || 'today' // today, week, month
+    const range = searchParams.get('range') || 'today'
 
     const now = new Date()
     let start: Date
@@ -42,6 +46,33 @@ export async function GET(request: NextRequest) {
     const invoiceCount = invoices.length
     const avgInvoice = invoiceCount > 0 ? totalSales / invoiceCount : 0
 
+    // المصروفات في نفس الفترة
+    const expenses = await db.expense.findMany({
+      where: { date: { gte: start, lte: end } },
+    })
+    const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0)
+    const expensesByCategory: Record<string, number> = {}
+    for (const exp of expenses) {
+      expensesByCategory[exp.category] = (expensesByCategory[exp.category] || 0) + exp.amount
+    }
+
+    // المشتريات في نفس الفترة
+    const purchases = await db.purchase.findMany({
+      where: {
+        status: 'completed',
+        createdAt: { gte: start, lte: end },
+      },
+    })
+    const totalPurchases = purchases.reduce((s, p) => s + p.total, 0)
+
+    // المخزون
+    const allInventory = await db.inventoryItem.findMany({ where: { isActive: true } })
+    const totalInventoryItems = allInventory.length
+    const lowStockItems = allInventory
+      .filter(i => i.quantity <= i.minQuantity)
+      .map(i => ({ name: i.name, quantity: i.quantity, minQuantity: i.minQuantity, unit: i.unit }))
+    const totalInventoryValue = allInventory.reduce((s, i) => s + i.quantity * i.costPerUnit, 0)
+
     // طرق الدفع
     const byPaymentMethod: Record<string, number> = {}
     for (const inv of invoices) {
@@ -64,7 +95,7 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 8)
 
-    // مبيعات يومية (للأسبوع)
+    // مبيعات يومية
     const dailySales: { date: string; total: number; count: number }[] = []
     const days = range === 'month' ? 30 : 7
     for (let i = days - 1; i >= 0; i--) {
@@ -102,6 +133,20 @@ export async function GET(request: NextRequest) {
         totalDiscount,
         invoiceCount,
         avgInvoice,
+      },
+      expenses: {
+        total: totalExpenses,
+        byCategory: expensesByCategory,
+      },
+      purchases: {
+        total: totalPurchases,
+        count: purchases.length,
+      },
+      inventory: {
+        totalItems: totalInventoryItems,
+        lowStock: lowStockItems.length,
+        totalValue: totalInventoryValue,
+        lowStockItems,
       },
       byPaymentMethod,
       topItems,

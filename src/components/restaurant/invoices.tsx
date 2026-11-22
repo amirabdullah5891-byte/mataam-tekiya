@@ -3,10 +3,10 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
   Plus, Search, Eye, Trash2, Loader2, Receipt, Printer,
-  Minus, X, ShoppingCart, User, Hash,
+  Minus, X, ShoppingCart, User, Phone,
 } from 'lucide-react'
 import {
-  Card, CardContent, CardHeader, CardTitle, CardDescription,
+  Card, CardContent,
 } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,9 +28,11 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { toast } from 'sonner'
 import {
-  formatCurrency, formatDate, formatDateTime, formatTime,
+  formatCurrency, formatDate, formatDateTime,
   paymentMethodLabel, statusLabel,
 } from '@/lib/format'
+import { RESTAURANT_INFO } from '@/lib/restaurant'
+import type { AppUser } from './app'
 
 type MenuItem = {
   id: string
@@ -53,6 +55,7 @@ type Invoice = {
   id: string
   invoiceNumber: string
   customerName: string | null
+  customerPhone: string | null
   tableNumber: string | null
   subtotal: number
   taxRate: number
@@ -65,12 +68,11 @@ type Invoice = {
   status: string
   notes: string | null
   shift: string | null
-  cashier: string | null
   createdAt: string
   items: InvoiceItem[]
 }
 
-export default function Invoices() {
+export default function Invoices({ user }: { user: AppUser }) {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -101,7 +103,7 @@ export default function Invoices() {
     return (
       inv.invoiceNumber.toLowerCase().includes(q) ||
       (inv.customerName || '').toLowerCase().includes(q) ||
-      (inv.tableNumber || '').toLowerCase().includes(q)
+      (inv.customerPhone || '').includes(q)
     )
   })
 
@@ -123,7 +125,7 @@ export default function Invoices() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight">الفواتير</h2>
           <p className="text-muted-foreground text-sm">
-            {invoices.length} فاتورة
+            {invoices.length} فاتورة - إنشاء وطباعة الفواتير الحرارية
           </p>
         </div>
         <Button onClick={() => setCreateOpen(true)} size="lg">
@@ -137,7 +139,7 @@ export default function Invoices() {
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="ابحث برقم الفاتورة أو اسم الزبون..."
+                placeholder="ابحث برقم الفاتورة أو اسم/هاتف الزبون..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pr-9"
@@ -175,6 +177,7 @@ export default function Invoices() {
                   <TableRow>
                     <TableHead className="text-right">رقم الفاتورة</TableHead>
                     <TableHead className="text-right hidden md:table-cell">الزبون</TableHead>
+                    <TableHead className="text-right hidden lg:table-cell">الهاتف</TableHead>
                     <TableHead className="text-right hidden lg:table-cell">التاريخ</TableHead>
                     <TableHead className="text-right hidden sm:table-cell">الدفع</TableHead>
                     <TableHead className="text-right">الحالة</TableHead>
@@ -189,6 +192,9 @@ export default function Invoices() {
                       <TableCell className="hidden md:table-cell max-w-[150px] truncate">
                         {inv.customerName || <span className="text-muted-foreground">—</span>}
                       </TableCell>
+                      <TableCell className="hidden lg:table-cell text-sm font-mono" dir="ltr">
+                        {inv.customerPhone || <span className="text-muted-foreground">—</span>}
+                      </TableCell>
                       <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">
                         {formatDateTime(inv.createdAt)}
                       </TableCell>
@@ -196,9 +202,7 @@ export default function Invoices() {
                         <Badge variant="outline">{paymentMethodLabel(inv.paymentMethod)}</Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant={inv.status === 'completed' ? 'default' : 'destructive'}
-                        >
+                        <Badge variant={inv.status === 'completed' ? 'default' : 'destructive'}>
                           {statusLabel(inv.status)}
                         </Badge>
                       </TableCell>
@@ -207,10 +211,7 @@ export default function Invoices() {
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-center gap-1">
-                          <Button
-                            size="sm" variant="ghost"
-                            onClick={() => setViewInvoice(inv)}
-                          >
+                          <Button size="sm" variant="ghost" onClick={() => setViewInvoice(inv)}>
                             <Eye className="h-4 w-4" />
                           </Button>
                           {inv.status === 'completed' && (
@@ -237,6 +238,7 @@ export default function Invoices() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         onSuccess={fetchInvoices}
+        user={user}
       />
 
       <InvoiceViewDialog
@@ -249,22 +251,23 @@ export default function Invoices() {
 
 // ===== نافذة إنشاء فاتورة جديدة =====
 function NewInvoiceDialog({
-  open, onOpenChange, onSuccess,
+  open, onOpenChange, onSuccess, user,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
   onSuccess: () => void
+  user: AppUser
 }) {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [cart, setCart] = useState<{ menuItemId: string; name: string; price: number; quantity: number }[]>([])
   const [customerName, setCustomerName] = useState('')
+  const [customerPhone, setCustomerPhone] = useState('')
   const [tableNumber, setTableNumber] = useState('')
   const [taxRate, setTaxRate] = useState('0')
   const [discount, setDiscount] = useState('0')
   const [paidAmount, setPaidAmount] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('cash')
   const [notes, setNotes] = useState('')
-  const [cashier, setCashier] = useState('')
   const [shift, setShift] = useState<'صباحية' | 'مسائية' | ''>('')
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState('all')
@@ -320,9 +323,9 @@ function NewInvoiceDialog({
   }
 
   const resetForm = () => {
-    setCart([]); setCustomerName(''); setTableNumber('')
+    setCart([]); setCustomerName(''); setCustomerPhone(''); setTableNumber('')
     setTaxRate('0'); setDiscount('0'); setPaidAmount('')
-    setPaymentMethod('cash'); setNotes(''); setCashier(''); setShift('')
+    setPaymentMethod('cash'); setNotes(''); setShift('')
     setSearch(''); setFilterCategory('all')
   }
 
@@ -341,7 +344,9 @@ function NewInvoiceDialog({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          customerName, tableNumber,
+          customerName,
+          customerPhone,
+          tableNumber,
           items: cart.map(c => ({
             menuItemId: c.menuItemId, name: c.name, quantity: c.quantity, price: c.price,
           })),
@@ -349,7 +354,7 @@ function NewInvoiceDialog({
           discount: Number(discount),
           paidAmount: Number(paidAmount),
           paymentMethod,
-          notes, cashier, shift: shift || undefined,
+          notes, shift: shift || undefined,
         }),
       })
       if (!res.ok) throw new Error()
@@ -371,7 +376,7 @@ function NewInvoiceDialog({
         <DialogHeader>
           <DialogTitle className="text-xl">فاتورة جديدة</DialogTitle>
           <DialogDescription>
-            اختر الأطباق من القائمة، ثم أدخل تفاصيل الدفع
+            اختر الأطباق من القائمة، ثم أدخل تفاصيل الدفع - الكاشير: {user.name}
           </DialogDescription>
         </DialogHeader>
 
@@ -459,15 +464,38 @@ function NewInvoiceDialog({
               )}
             </ScrollArea>
 
-            {/* تفاصيل إضافية */}
+            {/* معلومات الزبون */}
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
-                <Label className="text-xs">اسم الزبون</Label>
+                <Label className="text-xs flex items-center gap-1"><User className="h-3 w-3" /> اسم الزبون</Label>
                 <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="اختياري" className="h-8 text-sm" />
               </div>
               <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1"><Phone className="h-3 w-3" /> هاتف الزبون</Label>
+                <Input
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  placeholder="مثال: 0123456789"
+                  className="h-8 text-sm"
+                  dir="ltr"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
                 <Label className="text-xs">رقم الطاولة</Label>
                 <Input value={tableNumber} onChange={(e) => setTableNumber(e.target.value)} placeholder="اختياري" className="h-8 text-sm" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">الوردية</Label>
+                <Select value={shift} onValueChange={(v) => setShift(v as any)}>
+                  <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="صباحية">صباحية</SelectItem>
+                    <SelectItem value="مسائية">مسائية</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -482,34 +510,17 @@ function NewInvoiceDialog({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label className="text-xs">طريقة الدفع</Label>
-                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">نقداً</SelectItem>
-                    <SelectItem value="card">بطاقة</SelectItem>
-                    <SelectItem value="transfer">تحويل</SelectItem>
-                    <SelectItem value="credit">آجل</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">الوردية</Label>
-                <Select value={shift} onValueChange={(v) => setShift(v as any)}>
-                  <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="—" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="صباحية">صباحية</SelectItem>
-                    <SelectItem value="مسائية">مسائية</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
             <div className="space-y-1">
-              <Label className="text-xs">الكاشير</Label>
-              <Input value={cashier} onChange={(e) => setCashier(e.target.value)} placeholder="اسم الموظف" className="h-8 text-sm" />
+              <Label className="text-xs">طريقة الدفع</Label>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">نقداً</SelectItem>
+                  <SelectItem value="card">بطاقة</SelectItem>
+                  <SelectItem value="transfer">تحويل</SelectItem>
+                  <SelectItem value="credit">آجل</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-1">
@@ -552,7 +563,7 @@ function NewInvoiceDialog({
 
             <Button onClick={handleSubmit} disabled={saving || cart.length === 0} className="w-full" size="lg">
               {saving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
-              حفظ الفاتورة
+              حفظ وطباعة الفاتورة
             </Button>
           </div>
         </div>
@@ -561,7 +572,7 @@ function NewInvoiceDialog({
   )
 }
 
-// ===== نافذة عرض الفاتورة =====
+// ===== نافذة عرض الفاتورة + طباعة حرارية =====
 function InvoiceViewDialog({
   invoice, onOpenChange,
 }: {
@@ -570,35 +581,129 @@ function InvoiceViewDialog({
 }) {
   if (!invoice) return null
 
-  const handlePrint = () => {
-    const printContents = document.getElementById('invoice-print-area')?.innerHTML
-    if (!printContents) return
-    const win = window.open('', '_blank', 'width=400,height=600')
-    if (!win) return
-    win.document.write(`
+  const handleThermalPrint = () => {
+    const itemsHtml = invoice.items.map(item => `
+      <tr>
+        <td class="name">${item.name}</td>
+        <td class="qty">${item.quantity}</td>
+        <td class="price">${formatCurrency(item.price)}</td>
+        <td class="total">${formatCurrency(item.total)}</td>
+      </tr>
+    `).join('')
+
+    const printContents = `
+      <!DOCTYPE html>
       <html dir="rtl" lang="ar">
       <head>
+        <meta charset="UTF-8">
         <title>فاتورة ${invoice.invoiceNumber}</title>
         <style>
-          body { font-family: 'Cairo', sans-serif; padding: 20px; }
-          .header { text-align: center; border-bottom: 2px dashed #999; padding-bottom: 10px; margin-bottom: 15px; }
-          .header h2 { margin: 0; color: #d97706; }
-          .header p { margin: 4px 0; font-size: 13px; color: #555; }
-          table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-          th, td { text-align: right; padding: 6px 4px; font-size: 13px; border-bottom: 1px dashed #ccc; }
-          th { background: #f5f5f5; }
-          .totals { margin-top: 15px; }
-          .totals div { display: flex; justify-content: space-between; padding: 4px 0; font-size: 14px; }
-          .grand { border-top: 2px dashed #999; margin-top: 5px; padding-top: 5px; font-weight: bold; font-size: 16px; color: #d97706; }
-          .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #999; border-top: 1px dashed #999; padding-top: 10px; }
+          @page { size: 80mm auto; margin: 2mm; }
+          * { box-sizing: border-box; }
+          body {
+            font-family: 'Cairo', 'Tahoma', sans-serif;
+            width: 76mm;
+            margin: 0 auto;
+            padding: 2mm;
+            font-size: 11px;
+            color: #000;
+          }
+          .header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 4mm; margin-bottom: 3mm; }
+          .header .name { font-size: 16px; font-weight: bold; }
+          .header .sub { font-size: 12px; font-weight: bold; margin-top: 1mm; }
+          .header .addr { font-size: 10px; margin-top: 1mm; }
+          .header .phones { font-size: 11px; font-weight: bold; margin-top: 1mm; }
+          .info { margin-bottom: 3mm; font-size: 11px; }
+          .info div { display: flex; justify-content: space-between; padding: 0.5mm 0; }
+          .info .label { color: #555; }
+          table { width: 100%; border-collapse: collapse; margin: 2mm 0; }
+          thead th {
+            text-align: right;
+            font-size: 10px;
+            border-bottom: 1px dashed #000;
+            padding: 1mm 0;
+            font-weight: bold;
+          }
+          tbody td {
+            font-size: 10px;
+            padding: 1mm 0;
+            border-bottom: 1px dotted #ccc;
+          }
+          td.name { width: 45%; }
+          td.qty { width: 12%; text-align: center; }
+          td.price { width: 20%; text-align: center; }
+          td.total { width: 23%; text-align: left; font-weight: bold; }
+          .totals { margin-top: 2mm; }
+          .totals div { display: flex; justify-content: space-between; padding: 0.8mm 0; font-size: 11px; }
+          .totals .grand {
+            border-top: 1px dashed #000;
+            margin-top: 1mm;
+            padding-top: 1.5mm;
+            font-size: 14px;
+            font-weight: bold;
+          }
+          .footer { text-align: center; margin-top: 4mm; padding-top: 2mm; border-top: 1px dashed #000; font-size: 10px; }
+          .footer .thanks { font-weight: bold; margin-bottom: 1mm; }
+          @media print {
+            body { width: 76mm; }
+          }
         </style>
       </head>
-      <body>${printContents}</body>
+      <body>
+        <div class="header">
+          <div class="name">${RESTAURANT_INFO.name}</div>
+          <div class="sub">${RESTAURANT_INFO.subtitle}</div>
+          <div class="addr">${RESTAURANT_INFO.address}</div>
+          <div class="phones">ت: ${RESTAURANT_INFO.phones.join(' - ')}</div>
+        </div>
+        <div class="info">
+          <div><span class="label">رقم الفاتورة:</span><span>${invoice.invoiceNumber}</span></div>
+          <div><span class="label">التاريخ:</span><span>${formatDateTime(invoice.createdAt)}</span></div>
+          ${invoice.customerName ? `<div><span class="label">الزبون:</span><span>${invoice.customerName}</span></div>` : ''}
+          ${invoice.customerPhone ? `<div><span class="label">الهاتف:</span><span dir="ltr">${invoice.customerPhone}</span></div>` : ''}
+          ${invoice.tableNumber ? `<div><span class="label">الطاولة:</span><span>${invoice.tableNumber}</span></div>` : ''}
+          <div><span class="label">الدفع:</span><span>${paymentMethodLabel(invoice.paymentMethod)}</span></div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th class="name">الصنف</th>
+              <th class="qty">كمية</th>
+              <th class="price">سعر</th>
+              <th class="total">إجمالي</th>
+            </tr>
+          </thead>
+          <tbody>${itemsHtml}</tbody>
+        </table>
+        <div class="totals">
+          <div><span>المجموع الفرعي:</span><span>${formatCurrency(invoice.subtotal)}</span></div>
+          ${invoice.taxAmount > 0 ? `<div><span>ضريبة (${invoice.taxRate}%):</span><span>${formatCurrency(invoice.taxAmount)}</span></div>` : ''}
+          ${invoice.discount > 0 ? `<div><span>خصم:</span><span>- ${formatCurrency(invoice.discount)}</span></div>` : ''}
+          <div class="grand"><span>الإجمالي:</span><span>${formatCurrency(invoice.total)}</span></div>
+          <div><span>المدفوع:</span><span>${formatCurrency(invoice.paidAmount)}</span></div>
+          ${invoice.change > 0 ? `<div><span>الباقي:</span><span>${formatCurrency(invoice.change)}</span></div>` : ''}
+        </div>
+        ${invoice.notes ? `<div style="margin-top:2mm;font-size:10px;"><b>ملاحظات:</b> ${invoice.notes}</div>` : ''}
+        <div class="footer">
+          <div class="thanks">شكراً لزيارتكم</div>
+          <div>ننتظر عودتكم</div>
+          <div style="margin-top:1mm;">${RESTAURANT_INFO.name}</div>
+        </div>
+      </body>
       </html>
-    `)
+    `
+
+    const win = window.open('', '_blank', 'width=400,height=600')
+    if (!win) {
+      toast.error('يرجى السماح بالنوافذ المنبثقة للطباعة')
+      return
+    }
+    win.document.write(printContents)
     win.document.close()
     win.focus()
-    setTimeout(() => win.print(), 250)
+    setTimeout(() => {
+      win.print()
+    }, 300)
   }
 
   return (
@@ -607,119 +712,121 @@ function InvoiceViewDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>تفاصيل الفاتورة</span>
-            <Button size="sm" variant="outline" onClick={handlePrint}>
-              <Printer className="h-4 w-4 ml-1" /> طباعة
+            <Button size="sm" onClick={handleThermalPrint}>
+              <Printer className="h-4 w-4 ml-1" /> طباعة حرارية
             </Button>
           </DialogTitle>
         </DialogHeader>
 
-        <div id="invoice-print-area">
-          {/* ترويسة الطباعة */}
-          <div className="header text-center border-b-2 border-dashed pb-3 mb-3">
-            <h2 className="text-xl font-bold text-primary">مطعم بلدي</h2>
-            <p className="text-xs text-muted-foreground">جوبا - جنوب السودان</p>
-          </div>
-
-          <div className="space-y-1 text-sm mb-4">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">رقم الفاتورة:</span>
-              <span className="font-mono font-medium">{invoice.invoiceNumber}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">التاريخ:</span>
-              <span>{formatDateTime(invoice.createdAt)}</span>
-            </div>
-            {invoice.customerName && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">الزبون:</span>
-                <span>{invoice.customerName}</span>
-              </div>
-            )}
-            {invoice.tableNumber && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">الطاولة:</span>
-                <span>{invoice.tableNumber}</span>
-              </div>
-            )}
-            {invoice.cashier && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">الكاشير:</span>
-                <span>{invoice.cashier}</span>
-              </div>
-            )}
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">طريقة الدفع:</span>
-              <span>{paymentMethodLabel(invoice.paymentMethod)}</span>
-            </div>
-          </div>
-
-          <div className="border-t border-dashed pt-3">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-right text-xs">الصنف</TableHead>
-                  <TableHead className="text-center text-xs">كمية</TableHead>
-                  <TableHead className="text-center text-xs">سعر</TableHead>
-                  <TableHead className="text-left text-xs">إجمالي</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invoice.items.map(item => (
-                  <TableRow key={item.id}>
-                    <TableCell className="text-sm py-2">{item.name}</TableCell>
-                    <TableCell className="text-center text-sm">{item.quantity}</TableCell>
-                    <TableCell className="text-center text-sm">{formatCurrency(item.price)}</TableCell>
-                    <TableCell className="text-left text-sm font-medium">{formatCurrency(item.total)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          <div className="space-y-1 mt-4 pt-3 border-t border-dashed text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">المجموع الفرعي</span>
-              <span>{formatCurrency(invoice.subtotal)}</span>
-            </div>
-            {invoice.taxAmount > 0 && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">ضريبة ({invoice.taxRate}%)</span>
-                <span>{formatCurrency(invoice.taxAmount)}</span>
-              </div>
-            )}
-            {invoice.discount > 0 && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">خصم</span>
-                <span>- {formatCurrency(invoice.discount)}</span>
-              </div>
-            )}
-            <div className="flex justify-between font-bold text-base pt-1 border-t border-dashed mt-1">
-              <span>الإجمالي</span>
-              <span className="text-primary">{formatCurrency(invoice.total)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">المدفوع</span>
-              <span>{formatCurrency(invoice.paidAmount)}</span>
-            </div>
-            {invoice.change > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">الباقي</span>
-                <span>{formatCurrency(invoice.change)}</span>
-              </div>
-            )}
-          </div>
-
-          {invoice.notes && (
-            <div className="mt-3 p-2 bg-muted rounded text-sm">
-              <span className="text-muted-foreground">ملاحظات: </span>
-              {invoice.notes}
-            </div>
-          )}
-
-          <p className="text-center text-xs text-muted-foreground mt-4 pt-3 border-t border-dashed">
-            شكراً لزيارتكم - مطعم بلدي
+        {/* ترويسة الطباعة على الشاشة */}
+        <div className="text-center border-b-2 border-dashed pb-3 mb-3">
+          <h2 className="text-xl font-bold text-primary">{RESTAURANT_INFO.name}</h2>
+          <p className="text-sm font-medium">{RESTAURANT_INFO.subtitle}</p>
+          <p className="text-xs text-muted-foreground">{RESTAURANT_INFO.address}</p>
+          <p className="text-sm font-bold mt-1" dir="ltr">
+            {RESTAURANT_INFO.phones.join(' - ')}
           </p>
         </div>
+
+        <div className="space-y-1 text-sm mb-4">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">رقم الفاتورة:</span>
+            <span className="font-mono font-medium">{invoice.invoiceNumber}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">التاريخ:</span>
+            <span>{formatDateTime(invoice.createdAt)}</span>
+          </div>
+          {invoice.customerName && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">الزبون:</span>
+              <span>{invoice.customerName}</span>
+            </div>
+          )}
+          {invoice.customerPhone && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">هاتف الزبون:</span>
+              <span className="font-mono" dir="ltr">{invoice.customerPhone}</span>
+            </div>
+          )}
+          {invoice.tableNumber && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">الطاولة:</span>
+              <span>{invoice.tableNumber}</span>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">طريقة الدفع:</span>
+            <span>{paymentMethodLabel(invoice.paymentMethod)}</span>
+          </div>
+        </div>
+
+        <div className="border-t border-dashed pt-3">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-right text-xs">الصنف</TableHead>
+                <TableHead className="text-center text-xs">كمية</TableHead>
+                <TableHead className="text-center text-xs">سعر</TableHead>
+                <TableHead className="text-left text-xs">إجمالي</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {invoice.items.map(item => (
+                <TableRow key={item.id}>
+                  <TableCell className="text-sm py-2">{item.name}</TableCell>
+                  <TableCell className="text-center text-sm">{item.quantity}</TableCell>
+                  <TableCell className="text-center text-sm">{formatCurrency(item.price)}</TableCell>
+                  <TableCell className="text-left text-sm font-medium">{formatCurrency(item.total)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+
+        <div className="space-y-1 mt-4 pt-3 border-t border-dashed text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">المجموع الفرعي</span>
+            <span>{formatCurrency(invoice.subtotal)}</span>
+          </div>
+          {invoice.taxAmount > 0 && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">ضريبة ({invoice.taxRate}%)</span>
+              <span>{formatCurrency(invoice.taxAmount)}</span>
+            </div>
+          )}
+          {invoice.discount > 0 && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">خصم</span>
+              <span>- {formatCurrency(invoice.discount)}</span>
+            </div>
+          )}
+          <div className="flex justify-between font-bold text-base pt-1 border-t border-dashed mt-1">
+            <span>الإجمالي</span>
+            <span className="text-primary">{formatCurrency(invoice.total)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">المدفوع</span>
+            <span>{formatCurrency(invoice.paidAmount)}</span>
+          </div>
+          {invoice.change > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">الباقي</span>
+              <span>{formatCurrency(invoice.change)}</span>
+            </div>
+          )}
+        </div>
+
+        {invoice.notes && (
+          <div className="mt-3 p-2 bg-muted rounded text-sm">
+            <span className="text-muted-foreground">ملاحظات: </span>
+            {invoice.notes}
+          </div>
+        )}
+
+        <p className="text-center text-xs text-muted-foreground mt-4 pt-3 border-t border-dashed">
+          شكراً لزيارتكم - {RESTAURANT_INFO.name}
+        </p>
       </DialogContent>
     </Dialog>
   )

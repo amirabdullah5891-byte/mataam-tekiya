@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getSessionUser, unauthorizedResponse } from '@/lib/session'
 
 // GET /api/invoices/[id] - تفاصيل فاتورة واحدة
 export async function GET(
@@ -7,6 +8,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await getSessionUser(request)
+    if (!user) return unauthorizedResponse()
+
     const { id } = await params
 
     const invoice = await db.invoice.findUnique({
@@ -31,6 +35,9 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await getSessionUser(request)
+    if (!user) return unauthorizedResponse()
+
     const { id } = await params
     const body = await request.json()
 
@@ -64,6 +71,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await getSessionUser(request)
+    if (!user) return unauthorizedResponse()
+
     const { id } = await params
 
     const existing = await db.invoice.findUnique({ where: { id } })

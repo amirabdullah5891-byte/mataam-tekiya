@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getSessionUser, unauthorizedResponse } from '@/lib/session'
 
 // توليد رقم فاتورة تسلسلي بصيغة INV-YYYYMMDD-XXX
 async function generateInvoiceNumber(): Promise<string> {
@@ -25,6 +26,9 @@ async function generateInvoiceNumber(): Promise<string> {
 // GET /api/invoices - قائمة الفواتير
 export async function GET(request: NextRequest) {
   try {
+    const user = await getSessionUser(request)
+    if (!user) return unauthorizedResponse()
+
     const { searchParams } = new URL(request.url)
     const page = Number(searchParams.get('page') || '1')
     const limit = Number(searchParams.get('limit') || '20')
@@ -81,10 +85,14 @@ export async function GET(request: NextRequest) {
 // POST /api/invoices - إنشاء فاتورة جديدة
 export async function POST(request: NextRequest) {
   try {
+    const user = await getSessionUser(request)
+    if (!user) return unauthorizedResponse()
+
     const body = await request.json()
 
     const {
       customerName,
+      customerPhone,
       tableNumber,
       items,
       taxRate = 0,
@@ -93,7 +101,6 @@ export async function POST(request: NextRequest) {
       paymentMethod = 'cash',
       notes,
       shift,
-      cashier,
     } = body
 
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -131,6 +138,7 @@ export async function POST(request: NextRequest) {
       data: {
         invoiceNumber,
         customerName: customerName?.trim() || null,
+        customerPhone: customerPhone?.trim() || null,
         tableNumber: tableNumber?.trim() || null,
         subtotal,
         taxRate: Number(taxRate) || 0,
@@ -143,7 +151,7 @@ export async function POST(request: NextRequest) {
         status: 'completed',
         notes: notes?.trim() || null,
         shift: shift || null,
-        cashier: cashier?.trim() || null,
+        cashierId: user.id,
         items: { create: invoiceItemsData },
       },
       include: { items: true },

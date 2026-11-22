@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import {
-  TrendingUp, Receipt, Users, ShoppingCart, Crown,
-  ArrowUp, ArrowDown, Calendar, RefreshCw, Loader2,
+  TrendingUp, Receipt, Wallet, Boxes, ShoppingCart,
+  RefreshCw, Loader2, Crown, AlertTriangle,
 } from 'lucide-react'
 import {
   Card, CardContent, CardHeader, CardTitle, CardDescription,
@@ -22,19 +22,33 @@ import {
   PieChart, Pie, Cell, Legend,
 } from 'recharts'
 import {
-  formatCurrency, formatNumber, formatDateTime, rangeLabel,
-  paymentMethodLabel,
+  formatCurrency, formatNumber, formatDateTime, rangeLabel, paymentMethodLabel,
 } from '@/lib/format'
+import { RESTAURANT_INFO } from '@/lib/restaurant'
+import type { AppUser } from './app'
 
 type DashboardData = {
   range: string
-  period: { start: string; end: string }
   summary: {
     totalSales: number
     totalTax: number
     totalDiscount: number
     invoiceCount: number
     avgInvoice: number
+  }
+  expenses: {
+    total: number
+    byCategory: Record<string, number>
+  }
+  purchases: {
+    total: number
+    count: number
+  }
+  inventory: {
+    totalItems: number
+    lowStock: number
+    totalValue: number
+    lowStockItems: { name: string; quantity: number; minQuantity: number; unit: string }[]
   }
   byPaymentMethod: Record<string, number>
   topItems: { name: string; quantity: number; total: number }[]
@@ -49,7 +63,7 @@ const PAYMENT_COLORS: Record<string, string> = {
   credit: '#9333ea',
 }
 
-export default function Dashboard() {
+export default function Dashboard({ user }: { user: AppUser }) {
   const [data, setData] = useState<DashboardData | null>(null)
   const [range, setRange] = useState<'today' | 'week' | 'month'>('today')
   const [loading, setLoading] = useState(true)
@@ -95,7 +109,8 @@ export default function Dashboard() {
     )
   }
 
-  const { summary, byPaymentMethod, topItems, dailySales, recentInvoices } = data
+  const { summary, expenses, purchases, inventory, byPaymentMethod, topItems, dailySales, recentInvoices } = data
+  const netProfit = summary.totalSales - expenses.total - purchases.total
 
   const paymentData = Object.entries(byPaymentMethod).map(([method, value]) => ({
     name: paymentMethodLabel(method),
@@ -105,16 +120,17 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-slide-up">
-      {/* رأس لوحة المعلومات */}
+      {/* ترحيب */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">لوحة المعلومات</h2>
+          <h2 className="text-2xl font-bold tracking-tight">
+            مرحباً، {user.name} 👋
+          </h2>
           <p className="text-muted-foreground text-sm">
-            نظرة عامة على أداء المطعم خلال {rangeLabel(range)}
+            نظرة عامة على أداء {RESTAURANT_INFO.name} - {RESTAURANT_INFO.subtitle} خلال {rangeLabel(range)}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
           <Select value={range} onValueChange={(v) => setRange(v as any)}>
             <SelectTrigger className="w-40">
               <SelectValue />
@@ -131,7 +147,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* بطاقات الإحصائيات */}
+      {/* بطاقات الإحصائيات الرئيسية */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="إجمالي المبيعات"
@@ -141,31 +157,78 @@ export default function Dashboard() {
           tone="primary"
         />
         <StatCard
-          title="متوسط الفاتورة"
-          value={formatCurrency(summary.avgInvoice)}
-          icon={<Receipt className="h-5 w-5" />}
-          subtitle="لكل فاتورة"
+          title="المصروفات"
+          value={formatCurrency(expenses.total)}
+          icon={<Wallet className="h-5 w-5" />}
+          subtitle="رواتب، إيجار، كهرباء..."
+          tone="destructive"
+        />
+        <StatCard
+          title="المشتريات"
+          value={formatCurrency(purchases.total)}
+          icon={<ShoppingCart className="h-5 w-5" />}
+          subtitle={`${purchases.count} فاتورة شراء`}
           tone="accent"
         />
         <StatCard
-          title="ضريبة محصلة"
-          value={formatCurrency(summary.totalTax)}
-          icon={<ShoppingCart className="h-5 w-5" />}
-          subtitle="ضريبة القيمة المضافة"
+          title="صافي الربح"
+          value={formatCurrency(netProfit)}
+          icon={<Receipt className="h-5 w-5" />}
+          subtitle={netProfit >= 0 ? 'ربح' : 'خسارة'}
+          tone={netProfit >= 0 ? 'success' : 'destructive'}
+        />
+      </div>
+
+      {/* تنبيهات المخزون */}
+      {inventory.lowStock > 0 && (
+        <Card className="border-amber-300 bg-amber-50/50">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-medium text-amber-900">
+                  تنبيه: {inventory.lowStock} صنف في المخزون وصل للحد الأدنى
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {inventory.lowStockItems.slice(0, 5).map(item => (
+                    <Badge key={item.name} variant="outline" className="bg-white">
+                      {item.name}: {formatNumber(item.quantity)} {item.unit}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* بطاقات المخزون */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <StatCard
+          title="أصناف المخزون"
+          value={formatNumber(inventory.totalItems)}
+          icon={<Boxes className="h-5 w-5" />}
+          subtitle={`قيمة المخزون: ${formatCurrency(inventory.totalValue)}`}
           tone="secondary"
         />
         <StatCard
-          title="إجمالي الخصومات"
-          value={formatCurrency(summary.totalDiscount)}
-          icon={<Users className="h-5 w-5" />}
-          subtitle="خصومات منحها المطعم"
+          title="متوسط الفاتورة"
+          value={formatCurrency(summary.avgInvoice)}
+          icon={<Receipt className="h-5 w-5" />}
+          subtitle="لكل فاتورة مبيعات"
+          tone="muted"
+        />
+        <StatCard
+          title="الضرائب المحصلة"
+          value={formatCurrency(summary.totalTax)}
+          icon={<TrendingUp className="h-5 w-5" />}
+          subtitle="ضريبة القيمة المضافة"
           tone="muted"
         />
       </div>
 
       {/* الرسوم البيانية */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* مبيعات يومية */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-lg">المبيعات اليومية</CardTitle>
@@ -205,7 +268,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* طرق الدفع */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">طرق الدفع</CardTitle>
@@ -249,7 +311,6 @@ export default function Dashboard() {
 
       {/* الأكثر مبيعاً وآخر الفواتير */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* الأكثر مبيعاً */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -280,11 +341,9 @@ export default function Dashboard() {
                           </p>
                         </div>
                       </div>
-                      <div className="text-left">
-                        <p className="font-semibold text-primary">
-                          {formatCurrency(item.total)}
-                        </p>
-                      </div>
+                      <p className="font-semibold text-primary">
+                        {formatCurrency(item.total)}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -293,7 +352,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* آخر الفواتير */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">آخر الفواتير</CardTitle>
@@ -342,13 +400,15 @@ function StatCard({
   value: string
   icon: React.ReactNode
   subtitle?: string
-  tone: 'primary' | 'accent' | 'secondary' | 'muted'
+  tone: 'primary' | 'accent' | 'secondary' | 'muted' | 'destructive' | 'success'
 }) {
   const toneClasses = {
     primary: 'bg-primary text-primary-foreground',
     accent: 'bg-accent text-accent-foreground',
     secondary: 'bg-secondary text-secondary-foreground',
     muted: 'bg-muted text-muted-foreground',
+    destructive: 'bg-destructive text-destructive-foreground',
+    success: 'bg-emerald-600 text-white',
   }[tone]
 
   return (

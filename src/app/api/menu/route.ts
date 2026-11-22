@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getSessionUser, unauthorizedResponse } from '@/lib/session'
 
 // GET /api/menu - قائمة جميع عناصر القائمة
 export async function GET(request: NextRequest) {
   try {
+    const user = await getSessionUser(request)
+    if (!user) return unauthorizedResponse()
     const { searchParams } = new URL(request.url)
     const activeOnly = searchParams.get('active') === 'true'
     const category = searchParams.get('category')
@@ -40,6 +43,9 @@ export async function GET(request: NextRequest) {
 // POST /api/menu - إضافة عنصر جديد للقائمة
 export async function POST(request: NextRequest) {
   try {
+    const user = await getSessionUser(request)
+    if (!user) return unauthorizedResponse()
+
     const body = await request.json()
 
     const { name, category, price, cost, description, isActive } = body

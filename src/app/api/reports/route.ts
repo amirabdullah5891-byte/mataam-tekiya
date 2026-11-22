@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getSessionUser, unauthorizedResponse } from '@/lib/session'
 
 // GET /api/reports - تقارير المبيعات
 export async function GET(request: NextRequest) {
   try {
+    const user = await getSessionUser(request)
+    if (!user) return unauthorizedResponse()
+
     const { searchParams } = new URL(request.url)
     const from = searchParams.get('from')
     const to = searchParams.get('to')
@@ -55,7 +59,6 @@ export async function GET(request: NextRequest) {
       .map(([date, d]) => ({ date, ...d }))
       .sort((a, b) => a.date.localeCompare(b.date))
 
-    // تجميع حسب الفئة - يحتاج للبحث عن الفئة من menuItem
     const allMenuItems = await db.menuItem.findMany()
     const itemCategoryMap: Record<string, string> = {}
     for (const m of allMenuItems) itemCategoryMap[m.id] = m.category
@@ -70,7 +73,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // الأطباق الأكثر مبيعاً
     const itemStats: Record<string, { name: string; quantity: number; total: number }> = {}
     for (const inv of invoices) {
       for (const item of inv.items) {
@@ -83,7 +85,6 @@ export async function GET(request: NextRequest) {
     }
     const topItems = Object.values(itemStats).sort((a, b) => b.total - a.total)
 
-    // طرق الدفع
     const paymentBreakdown: Record<string, { count: number; total: number }> = {}
     for (const inv of invoices) {
       if (!paymentBreakdown[inv.paymentMethod]) {

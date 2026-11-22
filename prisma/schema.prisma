@@ -1,5 +1,5 @@
 // Prisma schema for Restaurant Accounting System
-// نظام حسابات المطعم البلدي
+// نظام حسابات مطعم التكية - أبو أمنة الشعبي
 
 generator client {
   provider = "prisma-client-js"
@@ -10,15 +10,32 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// المستخدمون - نظام تسجيل دخول متعدد المستخدمين
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String   // مشفرة باستخدام scrypt
+  name      String
+  role      String   @default("cashier") // admin, manager, cashier
+  isActive  Boolean  @default(true)
+  lastLogin DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  expenses  Expense[]
+  purchases Purchase[]
+  invoices  Invoice[]
+}
+
 // عناصر قائمة الطعام - الأطباق والمشروبات المتاحة للبيع
 model MenuItem {
   id          String         @id @default(cuid())
-  name        String         // اسم الطبق بالعربية
-  category    String         // الفئة: مشوي، مقلي، مشروبات، حساء، أرز، خبز، حلويات
-  price       Float          // السعر بالجنيه الجنوب سوداني
-  cost        Float          @default(0) // التكلفة التقديرية
-  isActive    Boolean        @default(true) // متاح للبيع
-  description String?        // وصف الطبق
+  name        String
+  category    String
+  price       Float
+  cost        Float          @default(0)
+  isActive    Boolean        @default(true)
+  description String?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   invoiceItems InvoiceItem[]
@@ -27,22 +44,24 @@ model MenuItem {
 // الفاتورة - تمثل عملية بيع واحدة
 model Invoice {
   id            String         @id @default(cuid())
-  invoiceNumber String         @unique // رقم الفاتورة التسلسلي
-  customerName  String?        // اسم الزبون
-  tableNumber   String?        // رقم الطاولة
+  invoiceNumber String         @unique
+  customerName  String?
+  customerPhone String?        // رقم هاتف الزبون
+  tableNumber   String?
   items         InvoiceItem[]
-  subtotal      Float          @default(0) // المجموع قبل الضريبة والخصم
-  taxRate       Float          @default(0) // نسبة الضريبة %
-  taxAmount     Float          @default(0) // مبلغ الضريبة
-  discount      Float          @default(0) // الخصم
-  total         Float          @default(0) // الإجمالي النهائي
-  paidAmount    Float          @default(0) // المبلغ المدفوع
-  change        Float          @default(0) // الباقي للزبون
-  paymentMethod String         @default("cash") // cash, card, transfer
-  status        String         @default("completed") // completed, cancelled, refunded
-  notes         String?        // ملاحظات
-  shift         String?        // الوردية: صباحية، مسائية
-  cashier       String?        // اسم الكاشير
+  subtotal      Float          @default(0)
+  taxRate       Float          @default(0)
+  taxAmount     Float          @default(0)
+  discount      Float          @default(0)
+  total         Float          @default(0)
+  paidAmount    Float          @default(0)
+  change        Float          @default(0)
+  paymentMethod String         @default("cash")
+  status        String         @default("completed")
+  notes         String?
+  shift         String?
+  cashierId     String?
+  cashier       User?          @relation(fields: [cashierId], references: [id])
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
@@ -51,29 +70,119 @@ model Invoice {
   @@index([paymentMethod])
 }
 
-// بنود الفاتورة - كل بند يمثل طبقاً واحداً بكمية محددة
+// بنود الفاتورة
 model InvoiceItem {
   id         String    @id @default(cuid())
   invoiceId  String
   invoice    Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   menuItemId String?
   menuItem   MenuItem? @relation(fields: [menuItemId], references: [id])
-  name       String    // اسم البند (نسخة محفوظة من وقت البيع)
-  quantity   Int       @default(1) // الكمية
-  price      Float     // سعر الوحدة وقت البيع
-  total      Float     @default(0) // الإجمالي = الكمية × السعر
+  name       String
+  quantity   Int       @default(1)
+  price      Float
+  total      Float     @default(0)
 
   @@index([invoiceId])
   @@index([menuItemId])
 }
 
-// المصروفات اليومية - اختياري للمطاعم المتوسطة
+// الموردون
+model Supplier {
+  id        String     @id @default(cuid())
+  name      String
+  phone     String?
+  address   String?
+  balance   Float      @default(0) // مستحقات للمورد
+  notes     String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  purchases Purchase[]
+
+  @@index([name])
+}
+
+// فواتير الشراء من الموردين
+model Purchase {
+  id             String         @id @default(cuid())
+  purchaseNumber String         @unique
+  supplierId     String
+  supplier       Supplier       @relation(fields: [supplierId], references: [id])
+  items          PurchaseItem[]
+  subtotal       Float          @default(0)
+  total          Float          @default(0)
+  paidAmount     Float          @default(0)
+  status         String         @default("completed") // completed, pending, cancelled
+  notes          String?
+  createdById    String?
+  createdBy      User?          @relation(fields: [createdById], references: [id])
+  createdAt      DateTime       @default(now())
+
+  @@index([supplierId])
+  @@index([createdAt])
+  @@index([status])
+}
+
+// بنود الشراء
+model PurchaseItem {
+  id              String        @id @default(cuid())
+  purchaseId      String
+  purchase        Purchase      @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  inventoryItemId String?
+  inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id])
+  name            String
+  quantity        Float
+  unit            String?
+  unitCost        Float
+  total           Float         @default(0)
+
+  @@index([purchaseId])
+  @@index([inventoryItemId])
+}
+
+// عناصر المخزون - المواد الخام
+model InventoryItem {
+  id           String          @id @default(cuid())
+  name         String
+  category     String          // لحوم، خضروات، مواد جافة، مشروبات، توابل، أخرى
+  unit         String          // كجم، لتر، قطعة، كيس، علبة
+  quantity     Float           @default(0)
+  minQuantity  Float           @default(0) // حد التنبيه
+  costPerUnit  Float           @default(0) // التكلفة لكل وحدة
+  isActive     Boolean         @default(true)
+  notes        String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  movements    StockMovement[]
+  purchaseItems PurchaseItem[]
+
+  @@index([category])
+  @@index([isActive])
+}
+
+// حركات المخزون - سجل التغيرات
+model StockMovement {
+  id              String        @id @default(cuid())
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  type            String        // in, out, adjust
+  quantity        Float
+  reason          String?
+  reference       String?
+  createdAt       DateTime      @default(now())
+
+  @@index([inventoryItemId])
+  @@index([createdAt])
+}
+
+// المصروفات - رواتب، إيجار، كهرباء، إلخ
 model Expense {
   id          String   @id @default(cuid())
-  category    String   // الفئة: رواتب، إيجار، كهرباء، ماء، مشتريات، أخرى
-  amount      Float     // المبلغ بالجنيه
-  description String?  // الوصف
+  category    String   // رواتب، إيجار، كهرباء، ماء، صيانة، مشتريات، أخرى
+  amount      Float
+  description String?
   date        DateTime @default(now())
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
 
   @@index([date])
