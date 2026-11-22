@@ -14,7 +14,7 @@ export async function PUT(
     const { id } = await params
     const body = await request.json()
 
-    const { name, category, price, cost, description, isActive } = body
+    const { name, category, price, cost, description, isActive, isAvailable, imageUrl, prepTime } = body
 
     const existing = await db.menuItem.findUnique({ where: { id } })
     if (!existing) {
@@ -30,6 +30,9 @@ export async function PUT(
         cost: cost !== undefined ? Number(cost) : existing.cost,
         description: description !== undefined ? (description?.trim() || null) : existing.description,
         isActive: isActive !== undefined ? Boolean(isActive) : existing.isActive,
+        isAvailable: isAvailable !== undefined ? Boolean(isAvailable) : existing.isAvailable,
+        imageUrl: imageUrl !== undefined ? (imageUrl?.trim() || null) : existing.imageUrl,
+        prepTime: prepTime !== undefined ? (prepTime ? Number(prepTime) : null) : existing.prepTime,
       },
     })
 

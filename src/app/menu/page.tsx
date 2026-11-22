@@ -3,22 +3,21 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
   ShoppingCart, Search, Plus, Minus, X, Loader2, Utensils,
-  MapPin, Phone, CheckCircle2, Wallet, ArrowLeft, Filter,
+  MapPin, Phone, CheckCircle2, Wallet, ArrowLeft, Star, Bell,
+  ImageOff, MessageSquare,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import {
   Card, CardContent,
 } from '@/components/ui/card'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { toast } from 'sonner'
 import { formatCurrency } from '@/lib/format'
@@ -33,6 +32,8 @@ type MenuItem = {
   imageUrl: string | null
   prepTime: number | null
   isAvailable: boolean
+  avgRating: number
+  totalReviews: number
 }
 
 type CartItem = {
@@ -41,6 +42,22 @@ type CartItem = {
   price: number
   quantity: number
   notes?: string
+}
+
+type Review = {
+  id: string
+  customerName: string | null
+  rating: number
+  comment: string | null
+  createdAt: string
+}
+
+type Notification = {
+  id: string
+  message: string
+  type: string
+  reference: string | null
+  createdAt: string
 }
 
 export default function MenuPage() {
@@ -63,6 +80,21 @@ export default function MenuPage() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'wallet'>('cash')
   const [notes, setNotes] = useState('')
 
+  // التقييمات
+  const [reviewsOpen, setReviewsOpen] = useState<MenuItem | null>(null)
+  const [reviewList, setReviewList] = useState<Review[]>([])
+  const [reviewsLoading, setReviewsLoading] = useState(false)
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false)
+  const [reviewItem, setReviewItem] = useState<MenuItem | null>(null)
+  const [reviewRating, setReviewRating] = useState(5)
+  const [reviewComment, setReviewComment] = useState('')
+  const [reviewName, setReviewName] = useState('')
+  const [reviewSubmitting, setReviewSubmitting] = useState(false)
+
+  // الإشعارات
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [notifications, setNotifications] = useState<Notification[]>([])
+
   const fetchMenu = useCallback(async () => {
     setLoading(true)
     try {
@@ -81,6 +113,34 @@ export default function MenuPage() {
   useEffect(() => {
     fetchMenu()
   }, [fetchMenu])
+
+  // فحص الإشعارات عند إدخال رقم الهاتف
+  const fetchNotifications = useCallback(async () => {
+    if (!customerPhone.trim()) {
+      setNotifications([])
+      return
+    }
+    try {
+      const res = await fetch(`/api/public/notifications?phone=${encodeURIComponent(customerPhone.trim())}`)
+      const json = await res.json()
+      setNotifications(json.notifications || [])
+    } catch {
+      // تجاهل
+    }
+  }, [customerPhone])
+
+  useEffect(() => {
+    if (customerPhone.length >= 9) {
+      fetchNotifications()
+    }
+  }, [customerPhone, fetchNotifications])
+
+  // تحديث الإشعارات تلقائياً كل 15 ثانية
+  useEffect(() => {
+    if (!customerPhone.trim() || customerPhone.length < 9) return
+    const interval = setInterval(fetchNotifications, 15000)
+    return () => clearInterval(interval)
+  }, [customerPhone, fetchNotifications])
 
   const filteredItems = items.filter(it => {
     const matchSearch = !search ||
@@ -161,7 +221,7 @@ export default function MenuPage() {
       setLastOrder(json.order)
       setCart([])
       setCheckoutOpen(false)
-      setCustomerName(''); setCustomerPhone(''); setTableNumber(''); setNotes('')
+      setCustomerName(''); setTableNumber(''); setNotes('')
       setPaymentMethod('cash')
       toast.success(json.message)
     } catch (e: any) {
@@ -170,6 +230,66 @@ export default function MenuPage() {
       setSubmitting(false)
     }
   }
+
+  // عرض تقييمات طبق
+  const openReviews = async (item: MenuItem) => {
+    setReviewsOpen(item)
+    setReviewsLoading(true)
+    try {
+      const res = await fetch(`/api/public/reviews?menuItemId=${item.id}`)
+      const json = await res.json()
+      setReviewList(json.reviews || [])
+    } catch {
+      toast.error('تعذر جلب التقييمات')
+    } finally {
+      setReviewsLoading(false)
+    }
+  }
+
+  // فتح نافذة إضافة تقييم
+  const openReviewDialog = (item: MenuItem) => {
+    setReviewItem(item)
+    setReviewRating(5)
+    setReviewComment('')
+    setReviewName(customerName || '')
+    setReviewDialogOpen(true)
+  }
+
+  const submitReview = async () => {
+    if (!reviewItem) return
+    if (!reviewComment.trim() && !reviewName.trim()) {
+      toast.error('أضف تعليقاً أو اسمك على الأقل')
+      return
+    }
+    setReviewSubmitting(true)
+    try {
+      const res = await fetch('/api/public/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          menuItemId: reviewItem.id,
+          customerName: reviewName.trim() || undefined,
+          customerPhone: customerPhone.trim() || undefined,
+          rating: reviewRating,
+          comment: reviewComment.trim() || undefined,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      toast.success('شكراً لك! تم إضافة تقييمك')
+      setReviewDialogOpen(false)
+      fetchMenu() // إعادة تحديث القائمة بمتوسط التقييم الجديد
+      if (reviewsOpen?.id === reviewItem.id) {
+        openReviews(reviewItem)
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'فشل في إضافة التقييم')
+    } finally {
+      setReviewSubmitting(false)
+    }
+  }
+
+  const unreadCount = notifications.length
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-accent/20 to-background">
@@ -185,7 +305,18 @@ export default function MenuPage() {
               <h1 className="text-base font-bold">{RESTAURANT_INFO.name}</h1>
               <p className="text-xs text-primary">{RESTAURANT_INFO.subtitle}</p>
             </div>
-            <div className="w-14" />
+            <button
+              onClick={() => setNotificationsOpen(true)}
+              className="relative p-2 rounded-lg hover:bg-muted transition-colors"
+              aria-label="الإشعارات"
+            >
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -left-1 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full h-4 min-w-4 px-1 flex items-center justify-center">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
           </div>
         </div>
       </header>
@@ -208,6 +339,13 @@ export default function MenuPage() {
           </div>
         </div>
       </div>
+
+      {/* تنبيه رقم الهاتف للاطلاع على الإشعارات */}
+      {customerPhone && customerPhone.length >= 9 && unreadCount > 0 && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-sm text-amber-800">
+          لديك {unreadCount} إشعار جديد. <button onClick={() => setNotificationsOpen(true)} className="font-bold underline">عرض</button>
+        </div>
+      )}
 
       {/* البحث */}
       <div className="sticky top-[60px] z-20 bg-background/95 backdrop-blur border-b">
@@ -265,7 +403,13 @@ export default function MenuPage() {
                   <h2 className="text-lg font-bold mb-3 px-1">{category}</h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {catItems.map(item => (
-                      <MenuItemCard key={item.id} item={item} onAdd={addToCart} />
+                      <MenuItemCard
+                        key={item.id}
+                        item={item}
+                        onAdd={addToCart}
+                        onViewReviews={openReviews}
+                        onAddReview={openReviewDialog}
+                      />
                     ))}
                   </div>
                 </section>
@@ -275,7 +419,13 @@ export default function MenuPage() {
                 <h2 className="text-lg font-bold mb-3 px-1">{activeCategory}</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {filteredItems.map(item => (
-                    <MenuItemCard key={item.id} item={item} onAdd={addToCart} />
+                    <MenuItemCard
+                      key={item.id}
+                      item={item}
+                      onAdd={addToCart}
+                      onViewReviews={openReviews}
+                      onAddReview={openReviewDialog}
+                    />
                   ))}
                 </div>
               </section>
@@ -308,9 +458,7 @@ export default function MenuPage() {
             <DialogTitle className="flex items-center gap-2">
               <ShoppingCart className="h-5 w-5" /> سلة الطلبات
             </DialogTitle>
-            <DialogDescription>
-              راجع طلبك قبل الإرسال
-            </DialogDescription>
+            <DialogDescription>راجع طلبك قبل الإرسال</DialogDescription>
           </DialogHeader>
 
           {cart.length === 0 ? (
@@ -368,9 +516,7 @@ export default function MenuPage() {
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>إتمام الطلب</DialogTitle>
-            <DialogDescription>
-              أدخل بياناتك لإرسال الطلب للمطعم
-            </DialogDescription>
+            <DialogDescription>أدخل بياناتك لإرسال الطلب للمطعم</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -395,8 +541,14 @@ export default function MenuPage() {
                 required
               />
               <p className="text-xs text-muted-foreground">
-                يُستخدم لربط الطلب بمحفظتك إن وُجدت
+                يُستخدم لربط الطلب بمحفظتك وتلقي إشعارات حالة الطلب
               </p>
+              {customerPhone.length >= 9 && unreadCount > 0 && (
+                <p className="text-xs text-amber-600 flex items-center gap-1">
+                  <Bell className="h-3 w-3" />
+                  لديك {unreadCount} إشعار جديد
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -416,9 +568,7 @@ export default function MenuPage() {
                   type="button"
                   onClick={() => setPaymentMethod('cash')}
                   className={`p-3 rounded-lg border-2 transition-all ${
-                    paymentMethod === 'cash'
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border'
+                    paymentMethod === 'cash' ? 'border-primary bg-primary/10' : 'border-border'
                   }`}
                 >
                   <div className="text-center">
@@ -431,9 +581,7 @@ export default function MenuPage() {
                   type="button"
                   onClick={() => setPaymentMethod('wallet')}
                   className={`p-3 rounded-lg border-2 transition-all ${
-                    paymentMethod === 'wallet'
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border'
+                    paymentMethod === 'wallet' ? 'border-primary bg-primary/10' : 'border-border'
                   }`}
                 >
                   <div className="text-center">
@@ -500,6 +648,10 @@ export default function MenuPage() {
                 سيتم تأكيد طلبك قريباً. الدفع نقداً عند الاستلام.
               </p>
             )}
+            <p className="text-xs text-muted-foreground mb-4 flex items-center justify-center gap-1">
+              <Bell className="h-3 w-3" />
+              ستتلقى إشعارات بحالة طلبك على رقم هاتفك
+            </p>
             <Button
               onClick={() => { setLastOrder(null); fetchMenu() }}
               variant="outline"
@@ -510,13 +662,225 @@ export default function MenuPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* نافذة التقييمات */}
+      <Dialog open={!!reviewsOpen} onOpenChange={(o) => !o && setReviewsOpen(null)}>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Star className="h-5 w-5 text-amber-500" />
+              تقييمات: {reviewsOpen?.name}
+            </DialogTitle>
+            <DialogDescription>
+              {reviewsOpen && (
+                <span className="flex items-center gap-2 mt-1">
+                  <span className="flex items-center gap-1">
+                    <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
+                    <span className="font-bold">{reviewsOpen.avgRating}</span>
+                  </span>
+                  <span className="text-muted-foreground">
+                    ({reviewsOpen.totalReviews} تقييم)
+                  </span>
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            {reviewsLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : reviewList.length === 0 ? (
+              <div className="text-center py-8">
+                <MessageSquare className="h-10 w-10 mx-auto mb-2 text-muted-foreground opacity-50" />
+                <p className="text-muted-foreground text-sm">لا توجد تقييمات بعد</p>
+                <p className="text-muted-foreground text-xs">كن أول من يقيّم هذا الطبق!</p>
+              </div>
+            ) : (
+              <ScrollArea className="max-h-[400px] -mx-2 px-2">
+                <div className="space-y-3">
+                  {reviewList.map(review => (
+                    <div key={review.id} className="p-3 rounded-lg bg-muted/50">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="font-medium text-sm">{review.customerName || 'زبون'}</p>
+                        <div className="flex items-center gap-0.5">
+                          {[1, 2, 3, 4, 5].map(n => (
+                            <Star
+                              key={n}
+                              className={`h-3 w-3 ${
+                                n <= review.rating
+                                  ? 'fill-amber-500 text-amber-500'
+                                  : 'text-muted-foreground'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      {review.comment && (
+                        <p className="text-sm text-muted-foreground">{review.comment}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {new Date(review.createdAt).toLocaleDateString('ar-SD')}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+
+            {reviewsOpen && (
+              <Button
+                onClick={() => openReviewDialog(reviewsOpen)}
+                variant="outline"
+                className="w-full"
+              >
+                <Star className="h-4 w-4 ml-2" />
+                أضف تقييمك
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* نافذة إضافة تقييم */}
+      <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>تقييم: {reviewItem?.name}</DialogTitle>
+            <DialogDescription>شاركنا رأيك في هذا الطبق</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>التقييم *</Label>
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map(n => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setReviewRating(n)}
+                    className="p-1"
+                  >
+                    <Star
+                      className={`h-8 w-8 transition-colors ${
+                        n <= reviewRating
+                          ? 'fill-amber-500 text-amber-500'
+                          : 'text-muted-foreground hover:text-amber-400'
+                      }`}
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="reviewName">الاسم</Label>
+              <Input
+                id="reviewName"
+                value={reviewName}
+                onChange={(e) => setReviewName(e.target.value)}
+                placeholder="اسمك (اختياري)"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="reviewComment">التعليق</Label>
+              <Textarea
+                id="reviewComment"
+                value={reviewComment}
+                onChange={(e) => setReviewComment(e.target.value)}
+                placeholder="كيف كان الطعم؟ هل تنصح به؟"
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReviewDialogOpen(false)}>إلغاء</Button>
+            <Button onClick={submitReview} disabled={reviewSubmitting}>
+              {reviewSubmitting && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+              إرسال التقييم
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* نافذة الإشعارات */}
+      <Dialog open={notificationsOpen} onOpenChange={setNotificationsOpen}>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Bell className="h-5 w-5" />
+              الإشعارات
+            </DialogTitle>
+            <DialogDescription>
+              {customerPhone
+                ? `مرتبطة برقم: ${customerPhone}`
+                : 'أدخل رقم هاتفك في نموذج الطلب لرؤية إشعاراتك'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {notifications.length === 0 ? (
+            <div className="text-center py-8">
+              <Bell className="h-10 w-10 mx-auto mb-2 text-muted-foreground opacity-50" />
+              <p className="text-muted-foreground text-sm">لا توجد إشعارات</p>
+            </div>
+          ) : (
+            <ScrollArea className="max-h-[500px] -mx-2 px-2">
+              <div className="space-y-2">
+                {notifications.map(notif => (
+                  <div key={notif.id} className="p-3 rounded-lg bg-muted/50 border-r-4 border-primary">
+                    <p className="text-sm">{notif.message}</p>
+                    {notif.reference && (
+                      <p className="text-xs text-muted-foreground mt-1 font-mono">
+                        طلب: {notif.reference}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {new Date(notif.createdAt).toLocaleString('ar-SD')}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
 
-function MenuItemCard({ item, onAdd }: { item: MenuItem; onAdd: (item: MenuItem) => void }) {
+function MenuItemCard({
+  item, onAdd, onViewReviews, onAddReview,
+}: {
+  item: MenuItem
+  onAdd: (item: MenuItem) => void
+  onViewReviews: (item: MenuItem) => void
+  onAddReview: (item: MenuItem) => void
+}) {
   return (
     <Card className={`overflow-hidden ${!item.isAvailable ? 'opacity-60' : ''}`}>
+      {/* صورة الطبق */}
+      {item.imageUrl ? (
+        <div className="aspect-video bg-muted overflow-hidden">
+          { }
+          <img
+            src={item.imageUrl}
+            alt={item.name}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              const target = e.currentTarget
+              target.style.display = 'none'
+            }}
+          />
+        </div>
+      ) : (
+        <div className="aspect-video bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center">
+          <ImageOff className="h-10 w-10 text-muted-foreground/40" />
+        </div>
+      )}
+
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">
@@ -524,7 +888,7 @@ function MenuItemCard({ item, onAdd }: { item: MenuItem; onAdd: (item: MenuItem)
             {item.description && (
               <p className="text-xs text-muted-foreground mb-2 line-clamp-2">{item.description}</p>
             )}
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap mb-2">
               <p className="text-primary font-bold">{formatCurrency(item.price)}</p>
               {item.prepTime && (
                 <Badge variant="outline" className="text-xs">
@@ -532,19 +896,51 @@ function MenuItemCard({ item, onAdd }: { item: MenuItem; onAdd: (item: MenuItem)
                 </Badge>
               )}
               {!item.isAvailable && (
-                <Badge variant="destructive" className="text-xs">
-                  غير متاح
-                </Badge>
+                <Badge variant="destructive" className="text-xs">غير متاح</Badge>
               )}
             </div>
+
+            {/* التقييم */}
+            {item.totalReviews > 0 && (
+              <button
+                onClick={() => onViewReviews(item)}
+                className="flex items-center gap-1 text-xs hover:underline"
+              >
+                <div className="flex items-center gap-0.5">
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <Star
+                      key={n}
+                      className={`h-3 w-3 ${
+                        n <= Math.round(item.avgRating)
+                          ? 'fill-amber-500 text-amber-500'
+                          : 'text-muted-foreground'
+                      }`}
+                    />
+                  ))}
+                </div>
+                <span className="font-bold">{item.avgRating}</span>
+                <span className="text-muted-foreground">({item.totalReviews})</span>
+              </button>
+            )}
           </div>
+        </div>
+
+        {/* أزرار */}
+        <div className="flex gap-2 mt-3">
           <Button
-            size="icon"
+            size="sm"
             onClick={() => onAdd(item)}
             disabled={!item.isAvailable}
-            className="flex-shrink-0"
+            className="flex-1"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-4 w-4 ml-1" /> إضافة
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => onAddReview(item)}
+          >
+            <Star className="h-4 w-4" />
           </Button>
         </div>
       </CardContent>

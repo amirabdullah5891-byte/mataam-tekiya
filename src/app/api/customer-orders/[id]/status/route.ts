@@ -1,8 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSessionUser, unauthorizedResponse } from '@/lib/session'
+import { RESTAURANT_INFO } from '@/lib/restaurant'
 
-// PUT /api/customer-orders/[id]/status - تحديث حالة الطلب
+// رسائل SMS حسب حالة الطلب
+function getStatusMessage(status: string, orderNumber: string, total: number): string {
+  switch (status) {
+    case 'confirmed':
+      return `${RESTAURANT_INFO.name}: تم تأكيد طلبك ${orderNumber}. جاري التحضير. شكراً لك!`
+    case 'preparing':
+      return `${RESTAURANT_INFO.name}: طلبك ${orderNumber} قيد التحضير الآن. سنخبرك عند جاهزيته.`
+    case 'ready':
+      return `${RESTAURANT_INFO.name}: طلبك ${orderNumber} جاهز للتسليم! يرجى الحضور لاستلامه.`
+    case 'completed':
+      return `${RESTAURANT_INFO.name}: تم تسليم طلبك ${orderNumber} بقيمة ${total} ج.س. نتمنى لكم وجبة شهية وننتظر عودتكم!`
+    case 'cancelled':
+      return `${RESTAURANT_INFO.name}: نعتذر، تم إلغاء طلبك ${orderNumber}. للاستفسار اتصل على ${RESTAURANT_INFO.phones[0]}`
+    default:
+      return `${RESTAURANT_INFO.name}: تحديث حالة طلبك ${orderNumber}: ${status}`
+  }
+}
+
+// PUT /api/customer-orders/[id]/status - تحديث حالة الطلب + إرسال SMS تلقائي
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -35,18 +54,16 @@ export async function PUT(
       completedAt?: Date
     } = { status }
 
-    // عند التأكيد لأول مرة، نسجل من قبِل من
     if (status === 'confirmed' && !existing.acceptedById) {
       data.acceptedById = user.id
       data.acceptedAt = new Date()
     }
 
-    // عند الإكمال
     if (status === 'completed') {
       data.completedAt = new Date()
     }
 
-    // عند الإلغاء بعد الدفع من المحفظة، نسترجع المبلغ
+    // معالجة الإلغاء مع استرجاع المحفظة
     if (status === 'cancelled' && existing.paymentMethod === 'wallet' && existing.customerId) {
       const customer = existing.customer
       if (customer) {
@@ -80,6 +97,21 @@ export async function PUT(
           return updated
         })
 
+        // إرسال إشعار SMS للزبون
+        if (existing.customerPhone) {
+          await db.notification.create({
+            data: {
+              customerPhone: existing.customerPhone,
+              customerName: existing.customerName,
+              message: getStatusMessage('cancelled', existing.orderNumber, existing.total),
+              type: 'order_status',
+              reference: existing.orderNumber,
+              status: 'sent',
+              sentAt: new Date(),
+            },
+          })
+        }
+
         return NextResponse.json({
           success: true,
           message: `تم إلغاء الطلب واسترجاع ${existing.total} ج.س لمحفظة الزبون`,
@@ -92,6 +124,25 @@ export async function PUT(
       data,
       include: { items: true },
     })
+
+    // إرسال إشعار SMS تلقائي للزبون عند تغير الحالة (لكل الحالات ما عدا pending)
+    if (status !== 'pending' && existing.customerPhone) {
+      try {
+        await db.notification.create({
+          data: {
+            customerPhone: existing.customerPhone,
+            customerName: existing.customerName,
+            message: getStatusMessage(status, existing.orderNumber, existing.total),
+            type: 'order_status',
+            reference: existing.orderNumber,
+            status: 'sent',
+            sentAt: new Date(),
+          },
+        })
+      } catch (e) {
+        console.error('Failed to send notification:', e)
+      }
+    }
 
     return NextResponse.json(updated)
   } catch (error) {

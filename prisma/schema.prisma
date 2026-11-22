@@ -39,12 +39,45 @@ model MenuItem {
   isActive    Boolean        @default(true)
   isAvailable Boolean        @default(true) // متاح حالياً (نفد من المخزون مؤقتاً)
   description String?
-  imageUrl    String?        // رابط صورة الطبق
+  imageUrl    String?        // رابط صورة الطبق (محلي أو خارجي)
   prepTime   Int?            // وقت التحضير بالدقائق
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   invoiceItems InvoiceItem[]
   orderItems  CustomerOrderItem[]
+  reviews     Review[]
+}
+
+// تقييمات الأطباق من الزبائن
+model Review {
+  id         String   @id @default(cuid())
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  customerName String?
+  customerPhone String?
+  rating     Int      // 1-5 نجوم
+  comment    String?
+  isHidden   Boolean  @default(false) // يمكن للمدير إخفاء التقييمات المسيئة
+  createdAt  DateTime @default(now())
+
+  @@index([menuItemId])
+  @@index([createdAt])
+}
+
+// إشعارات الزبائن (محاكاة SMS)
+model Notification {
+  id         String   @id @default(cuid())
+  customerPhone String
+  customerName String?
+  message    String
+  type       String   // order_status, promotion, etc.
+  reference  String?  // رقم الطلب المرتبط
+  status     String   @default("pending") // pending, sent, failed
+  createdAt  DateTime @default(now())
+  sentAt     DateTime?
+
+  @@index([customerPhone])
+  @@index([createdAt])
 }
 
 // الفاتورة - تمثل عملية بيع واحدة

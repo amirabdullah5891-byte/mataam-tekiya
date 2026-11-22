@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   Plus, Search, Edit, Trash2, Loader2, UtensilsCrossed,
-  ToggleLeft, ToggleRight, Tag,
+  ToggleLeft, ToggleRight, Tag, ImagePlus, X, ImageIcon,
 } from 'lucide-react'
 import {
   Card, CardContent, CardHeader, CardTitle, CardDescription,
@@ -16,7 +16,7 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
-  DialogHeader, DialogTitle, DialogTrigger,
+  DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -35,6 +35,9 @@ type MenuItem = {
   price: number
   cost: number
   description: string | null
+  imageUrl: string | null
+  prepTime: number | null
+  isAvailable: boolean
   isActive: boolean
   createdAt: string
 }
@@ -162,46 +165,64 @@ export default function MenuManagement() {
                   {catItems.map(item => (
                     <div
                       key={item.id}
-                      className={`p-4 rounded-lg border transition-all hover:shadow-sm ${
+                      className={`p-0 rounded-lg border overflow-hidden transition-all hover:shadow-sm ${
                         !item.isActive ? 'opacity-60' : ''
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <h4 className="font-semibold leading-tight">{item.name}</h4>
-                        <Badge variant={item.isActive ? 'default' : 'secondary'} className="text-xs">
-                          {item.isActive ? 'متاح' : 'متوقف'}
-                        </Badge>
-                      </div>
-                      {item.description && (
-                        <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-                          {item.description}
-                        </p>
-                      )}
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-lg font-bold text-primary">
-                            {formatCurrency(item.price)}
-                          </p>
-                          {item.cost > 0 && (
-                            <p className="text-xs text-muted-foreground">
-                              تكلفة: {formatCurrency(item.cost)}
-                            </p>
-                          )}
+                      {item.imageUrl ? (
+                        <div className="aspect-video bg-muted overflow-hidden">
+                          { }
+                          <img
+                            src={item.imageUrl}
+                            alt={item.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => { e.currentTarget.style.display = 'none' }}
+                          />
                         </div>
-                        <div className="flex gap-1">
-                          <Button
-                            size="sm" variant="ghost"
-                            onClick={() => { setEditingItem(item); setDialogOpen(true) }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm" variant="ghost"
-                            onClick={() => setDeleteTarget(item)}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                      ) : null}
+                      <div className="p-4">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <h4 className="font-semibold leading-tight">{item.name}</h4>
+                          <Badge variant={item.isActive ? 'default' : 'secondary'} className="text-xs">
+                            {item.isActive ? 'متاح' : 'متوقف'}
+                          </Badge>
+                        </div>
+                        {item.description && (
+                          <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                            {item.description}
+                          </p>
+                        )}
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-lg font-bold text-primary">
+                              {formatCurrency(item.price)}
+                            </p>
+                            {item.cost > 0 && (
+                              <p className="text-xs text-muted-foreground">
+                                تكلفة: {formatCurrency(item.cost)}
+                              </p>
+                            )}
+                            {item.prepTime && (
+                              <p className="text-xs text-muted-foreground">
+                                ⏱ {item.prepTime} دقيقة
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex gap-1">
+                            <Button
+                              size="sm" variant="ghost"
+                              onClick={() => { setEditingItem(item); setDialogOpen(true) }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm" variant="ghost"
+                              onClick={() => setDeleteTarget(item)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -271,7 +292,12 @@ function MenuItemDialog({
   const [cost, setCost] = useState('')
   const [description, setDescription] = useState('')
   const [isActive, setIsActive] = useState(true)
+  const [isAvailable, setIsAvailable] = useState(true)
+  const [imageUrl, setImageUrl] = useState('')
+  const [prepTime, setPrepTime] = useState('')
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (open) {
@@ -282,14 +308,46 @@ function MenuItemDialog({
         setCost(item.cost ? String(item.cost) : '')
         setDescription(item.description || '')
         setIsActive(item.isActive)
+        setIsAvailable(item.isAvailable)
+        setImageUrl(item.imageUrl || '')
+        setPrepTime(item.prepTime ? String(item.prepTime) : '')
       } else {
         setName(''); setCategory(categories[0] || 'مشويات')
-        setPrice(''); setCost(''); setDescription(''); setIsActive(true)
+        setPrice(''); setCost(''); setDescription(''); setIsActive(true); setIsAvailable(true)
+        setImageUrl(''); setPrepTime('')
       }
     }
   }, [open, item, categories])
 
   const allCategories = Array.from(new Set([...DEFAULT_CATEGORIES, ...categories]))
+
+  const handleFileUpload = async (file: File) => {
+    // التحقق من النوع والحجم
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('نوع الملف غير مدعوم. استخدم: JPG, PNG, WebP, GIF')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('حجم الصورة كبير جداً. الحد الأقصى 5 ميجابايت')
+      return
+    }
+
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/upload', { method: 'POST', body: formData })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      setImageUrl(json.imageUrl)
+      toast.success('تم رفع الصورة')
+    } catch (e: any) {
+      toast.error(e.message || 'فشل في رفع الصورة')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -306,6 +364,9 @@ function MenuItemDialog({
         cost: cost ? Number(cost) : 0,
         description: description.trim() || undefined,
         isActive,
+        isAvailable,
+        imageUrl: imageUrl.trim() || undefined,
+        prepTime: prepTime ? Number(prepTime) : undefined,
       }
       const url = item ? `/api/menu/${item.id}` : '/api/menu'
       const method = item ? 'PUT' : 'POST'
@@ -327,7 +388,7 @@ function MenuItemDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{item ? 'تعديل طبق' : 'إضافة طبق جديد'}</DialogTitle>
           <DialogDescription>
@@ -335,6 +396,65 @@ function MenuItemDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* صورة الطبق */}
+          <div className="space-y-2">
+            <Label>صورة الطبق</Label>
+            <div className="flex items-center gap-3">
+              <div className="w-20 h-20 rounded-lg border-2 border-dashed border-border overflow-hidden bg-muted flex items-center justify-center flex-shrink-0">
+                {imageUrl ? (
+                   
+                  <img src={imageUrl} alt="معاينة" className="w-full h-full object-cover" />
+                ) : (
+                  <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                )}
+              </div>
+              <div className="flex-1 space-y-1">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]
+                    if (f) handleFileUpload(f)
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="w-full"
+                >
+                  {uploading ? (
+                    <><Loader2 className="h-4 w-4 ml-2 animate-spin" /> جاري الرفع...</>
+                  ) : (
+                    <><ImagePlus className="h-4 w-4 ml-2" /> رفع صورة</>
+                  )}
+                </Button>
+                {imageUrl && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setImageUrl('')}
+                    className="w-full text-destructive hover:text-destructive"
+                  >
+                    <X className="h-4 w-4 ml-2" /> إزالة الصورة
+                  </Button>
+                )}
+              </div>
+            </div>
+            <Input
+              placeholder="أو ألصق رابط صورة هنا..."
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              dir="ltr"
+              className="text-xs"
+            />
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="name">اسم الطبق *</Label>
             <Input
@@ -389,6 +509,18 @@ function MenuItemDialog({
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="prepTime">وقت التحضير (دقيقة)</Label>
+            <Input
+              id="prepTime"
+              type="number"
+              min="1"
+              value={prepTime}
+              onChange={(e) => setPrepTime(e.target.value)}
+              placeholder="مثال: 15"
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="description">وصف الطبق</Label>
             <Textarea
               id="description"
@@ -400,11 +532,20 @@ function MenuItemDialog({
           </div>
 
           <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-            <Label htmlFor="active" className="cursor-pointer">متاح للبيع</Label>
+            <Label htmlFor="active" className="cursor-pointer">متاح في القائمة</Label>
             <Switch
               id="active"
               checked={isActive}
               onCheckedChange={setIsActive}
+            />
+          </div>
+
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <Label htmlFor="available" className="cursor-pointer">متوفر حالياً (لم ينفد)</Label>
+            <Switch
+              id="available"
+              checked={isAvailable}
+              onCheckedChange={setIsAvailable}
             />
           </div>
 

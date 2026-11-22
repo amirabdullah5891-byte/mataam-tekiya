@@ -19,19 +19,37 @@ export async function GET() {
         imageUrl: true,
         prepTime: true,
         isAvailable: true,
+        reviews: {
+          where: { isHidden: false },
+          select: { rating: true },
+        },
       },
     })
 
+    // حساب متوسط التقييم لكل طبق
+    const itemsWithRating = items.map(item => {
+      const totalReviews = item.reviews.length
+      const avgRating = totalReviews > 0
+        ? item.reviews.reduce((s, r) => s + r.rating, 0) / totalReviews
+        : 0
+      return {
+        ...item,
+        reviews: undefined, // لا نرسل التفاصيل
+        avgRating: Math.round(avgRating * 10) / 10,
+        totalReviews,
+      }
+    })
+
     // تجميع حسب الفئة
-    const grouped: Record<string, typeof items> = {}
-    for (const item of items) {
+    const grouped: Record<string, typeof itemsWithRating> = {}
+    for (const item of itemsWithRating) {
       if (!grouped[item.category]) grouped[item.category] = []
       grouped[item.category].push(item)
     }
 
     return NextResponse.json({
       restaurant: RESTAURANT_INFO,
-      items,
+      items: itemsWithRating,
       grouped,
       categories: Object.keys(grouped),
     })

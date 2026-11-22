@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { signOut } from 'next-auth/react'
 import {
   LayoutDashboard, Receipt, ShoppingCart, Boxes, Wallet,
-  Truck, BarChart3, Users, Utensils, LogOut, Menu, ChevronLeft, Bell, QrCode,
+  Truck, BarChart3, Users, Utensils, LogOut, Menu, ChevronLeft, Bell, QrCode, Star,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -24,6 +24,7 @@ import Reports from './reports'
 import UsersManagement from './users'
 import CustomerOrders from './customer-orders'
 import CustomersManagement from './customers'
+import ReviewsManagement from './reviews'
 
 export type AppUser = {
   id: string
@@ -43,6 +44,7 @@ type Tab =
   | 'users'
   | 'customerOrders'
   | 'customers'
+  | 'reviews'
 
 const NAV_SECTIONS: {
   title: string
@@ -69,6 +71,7 @@ const NAV_SECTIONS: {
       { id: 'inventory', label: 'المخزون', icon: <Boxes className="h-5 w-5" /> },
       { id: 'suppliers', label: 'الموردون', icon: <Truck className="h-5 w-5" /> },
       { id: 'expenses', label: 'المصروفات', icon: <Wallet className="h-5 w-5" /> },
+      { id: 'reviews', label: 'تقييمات الأطباق', icon: <Star className="h-5 w-5" /> },
     ],
   },
   {
@@ -264,6 +267,7 @@ export default function AppClient({ user }: { user: AppUser }) {
             {tab === 'inventory' && <Inventory user={user} />}
             {tab === 'expenses' && <Expenses user={user} />}
             {tab === 'suppliers' && <Suppliers user={user} />}
+            {tab === 'reviews' && <ReviewsManagement user={user} />}
             {tab === 'reports' && <Reports />}
             {tab === 'users' && user.role === 'admin' && <UsersManagement currentUser={user} />}
           </div>

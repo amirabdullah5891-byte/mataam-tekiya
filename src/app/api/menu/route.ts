@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
-    const { name, category, price, cost, description, isActive } = body
+    const { name, category, price, cost, description, isActive, isAvailable, imageUrl, prepTime } = body
 
     if (!name || !category || price === undefined) {
       return NextResponse.json(
@@ -65,6 +65,9 @@ export async function POST(request: NextRequest) {
         cost: Number(cost) || 0,
         description: description?.trim() || null,
         isActive: isActive !== false,
+        isAvailable: isAvailable !== false,
+        imageUrl: imageUrl?.trim() || null,
+        prepTime: prepTime ? Number(prepTime) : null,
       },
     })
 
