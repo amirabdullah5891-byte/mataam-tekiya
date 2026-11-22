@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   ShoppingCart, Search, Plus, Minus, X, Loader2, Utensils,
   MapPin, Phone, CheckCircle2, Wallet, ArrowLeft, Star, Bell,
-  ImageOff, MessageSquare,
+  ImageOff, MessageSquare, AlertCircle, RefreshCw,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -65,6 +65,7 @@ export default function MenuPage() {
   const [grouped, setGrouped] = useState<Record<string, MenuItem[]>>({})
   const [categories, setCategories] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState<string>('all')
   const [cart, setCart] = useState<CartItem[]>([])
@@ -97,14 +98,16 @@ export default function MenuPage() {
 
   const fetchMenu = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const res = await fetch('/api/public/menu')
+      if (!res.ok) throw new Error('فشل الاتصال بالخادم')
       const json = await res.json()
       setItems(json.items || [])
       setGrouped(json.grouped || {})
       setCategories(json.categories || [])
-    } catch {
-      toast.error('تعذر جلب القائمة')
+    } catch (e: any) {
+      setLoadError(e.message || 'تعذر جلب القائمة. تحقق من اتصالك بالإنترنت وحاول مرة أخرى.')
     } finally {
       setLoading(false)
     }
@@ -387,8 +390,17 @@ export default function MenuPage() {
       {/* القائمة */}
       <main className="container mx-auto px-4 py-4 pb-32">
         {loading ? (
-          <div className="flex justify-center py-20">
+          <div className="flex flex-col justify-center items-center py-20 gap-3">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">جاري تحميل القائمة...</p>
+          </div>
+        ) : loadError ? (
+          <div className="py-20 text-center">
+            <AlertCircle className="h-12 w-12 mx-auto mb-3 text-destructive" />
+            <p className="text-destructive mb-4 px-4">{loadError}</p>
+            <Button onClick={fetchMenu} variant="outline">
+              <RefreshCw className="h-4 w-4 ml-2" /> إعادة المحاولة
+            </Button>
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="py-20 text-center text-muted-foreground">

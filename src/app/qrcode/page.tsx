@@ -1,30 +1,76 @@
 'use client'
 
-import { useState } from 'react'
-import { Printer, Loader2, Utensils, MapPin, Phone, QrCode } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import QRCode from 'qrcode'
+import {
+  Printer, Loader2, Utensils, MapPin, Phone, QrCode, ExternalLink, Copy, Check,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { RESTAURANT_INFO } from '@/lib/restaurant'
 
 export default function QRCodePage() {
-  // نبني الـ URL مرة واحدة عند أول render
-  // window.location.origin متاح فقط على العميل، لذا نستخدم state lazy init
-  const [state] = useState(() => {
+  // lazy init - يعمل على العميل فقط بعد hydration
+  const [state] = useState<{
+    mounted: boolean
+    menuUrl: string
+  }>(() => {
     if (typeof window === 'undefined') {
-      return { qrUrl: '', menuUrl: '/menu', loading: true }
+      return { mounted: false, menuUrl: '' }
     }
-    const menuUrl = `${window.location.origin}/menu`
-    return {
-      qrUrl: `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(menuUrl)}`,
-      menuUrl,
-      loading: false,
-    }
+    return { mounted: true, menuUrl: `${window.location.origin}/menu` }
   })
+
+  const [customDomain, setCustomDomain] = useState('')
+  const [copied, setCopied] = useState(false)
+  const [qrDataUrl, setQrDataUrl] = useState('')
+
+  // الرابط النهائي (مخصص أو مكتشف)
+  const finalUrl = customDomain.trim()
+    ? `${customDomain.trim().replace(/\/$/, '')}/menu`
+    : state.menuUrl
+
+  // توليد QR Code محلياً (بدون اعتماد على خدمة خارجية)
+  useEffect(() => {
+    if (!finalUrl) return
+    QRCode.toDataURL(finalUrl, {
+      width: 400,
+      margin: 1,
+      color: { dark: '#000000', light: '#ffffff' },
+      errorCorrectionLevel: 'M',
+    })
+      .then((url) => setQrDataUrl(url))
+      .catch((err) => console.error('QR generation error:', err))
+  }, [finalUrl])
 
   const handlePrint = () => {
     window.print()
   }
 
-  if (state.loading) {
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(finalUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // تجاهل
+    }
+  }
+
+  const handleOpenMenu = () => {
+    window.open(finalUrl, '_blank')
+  }
+
+  const handleDownloadQR = () => {
+    if (!qrDataUrl) return
+    const a = document.createElement('a')
+    a.href = qrDataUrl
+    a.download = `qr-${RESTAURANT_INFO.name}-menu.png`
+    a.click()
+  }
+
+  if (!state.mounted) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -54,15 +100,26 @@ export default function QRCodePage() {
             </p>
 
             <div className="inline-block p-4 bg-white rounded-2xl shadow-md">
-              <img
-                src={state.qrUrl}
-                alt="QR Code"
-                className="w-64 h-64"
-                crossOrigin="anonymous"
-              />
+              {qrDataUrl ? (
+                <img
+                  src={qrDataUrl}
+                  alt="QR Code لقائمة مطعم التكية"
+                  className="w-64 h-64"
+                />
+              ) : (
+                <div className="w-64 h-64 flex items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              )}
             </div>
 
-            <div className="mt-6 space-y-1 text-sm">
+            {/* الرابط كنص - مهم للطباعة والنسخ */}
+            <div className="mt-4 p-2 bg-muted rounded-lg">
+              <p className="text-xs text-muted-foreground mb-1">الرابط:</p>
+              <p className="text-sm font-mono break-all" dir="ltr">{finalUrl}</p>
+            </div>
+
+            <div className="mt-4 space-y-1 text-sm">
               <p className="flex items-center justify-center gap-1">
                 <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
                 {RESTAURANT_INFO.address}
@@ -80,16 +137,50 @@ export default function QRCodePage() {
           </div>
         </div>
 
+        {/* إعدادات الرابط */}
+        <div className="mt-6 p-4 bg-card rounded-xl shadow-sm print:hidden">
+          <p className="font-semibold mb-2 text-sm">رابط المنيو الحالي:</p>
+          <p className="text-xs text-muted-foreground mb-3" dir="ltr">{finalUrl}</p>
+
+          <div className="space-y-2">
+            <Label htmlFor="customDomain" className="text-xs">
+              رابط مخصص (إن كنت تريد استخدام رابط آخر للهاتف)
+            </Label>
+            <Input
+              id="customDomain"
+              value={customDomain}
+              onChange={(e) => setCustomDomain(e.target.value)}
+              placeholder="https://example.com"
+              dir="ltr"
+              className="text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              اتركه فارغاً لاستخدام الرابط الحالي تلقائياً
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 mt-3">
+            <Button onClick={handleCopy} variant="outline" size="sm">
+              {copied ? (
+                <><Check className="h-4 w-4 ml-2" /> تم النسخ</>
+              ) : (
+                <><Copy className="h-4 w-4 ml-2" /> نسخ الرابط</>
+              )}
+            </Button>
+            <Button onClick={handleOpenMenu} variant="outline" size="sm">
+              <ExternalLink className="h-4 w-4 ml-2" /> فتح المنيو
+            </Button>
+          </div>
+          <Button onClick={handleDownloadQR} variant="outline" size="sm" className="w-full mt-2">
+            <QrCode className="h-4 w-4 ml-2" /> تنزيل صورة QR
+          </Button>
+        </div>
+
         {/* أزرار التحكم */}
-        <div className="mt-6 flex flex-col gap-2 print:hidden">
+        <div className="mt-4 flex flex-col gap-2 print:hidden">
           <Button onClick={handlePrint} size="lg" className="w-full">
             <Printer className="ml-2 h-5 w-5" /> طباعة البطاقة
           </Button>
-          <a href="/menu" className="w-full">
-            <Button variant="outline" size="lg" className="w-full">
-              <QrCode className="ml-2 h-5 w-5" /> معاينة المنيو
-            </Button>
-          </a>
           <a href="/" className="w-full">
             <Button variant="ghost" size="lg" className="w-full">
               العودة للرئيسية
@@ -107,6 +198,11 @@ export default function QRCodePage() {
             <li>يصلك الطلب في تبويب "طلبات الزبائن" بالإدارة</li>
             <li>يمكن للزبون شحن محفظته مسبقاً والدفع منها</li>
           </ol>
+          <div className="mt-3 p-2 bg-amber-50 text-amber-800 rounded text-xs">
+            <strong>ملاحظة مهمة:</strong> لكي يعمل الرابط على هواتف الزبائن،
+            يجب أن يكون هذا النظام منشوراً على إنترنت عام (مثل Vercel أو VPS).
+            الرابط الحالي يعمل فقط على نفس الشبكة.
+          </div>
         </div>
       </div>
 
