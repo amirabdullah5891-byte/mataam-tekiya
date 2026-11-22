@@ -1,0 +1,81 @@
+// Prisma schema for Restaurant Accounting System
+// نظام حسابات المطعم البلدي
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// عناصر قائمة الطعام - الأطباق والمشروبات المتاحة للبيع
+model MenuItem {
+  id          String         @id @default(cuid())
+  name        String         // اسم الطبق بالعربية
+  category    String         // الفئة: مشوي، مقلي، مشروبات، حساء، أرز، خبز، حلويات
+  price       Float          // السعر بالجنيه الجنوب سوداني
+  cost        Float          @default(0) // التكلفة التقديرية
+  isActive    Boolean        @default(true) // متاح للبيع
+  description String?        // وصف الطبق
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  invoiceItems InvoiceItem[]
+}
+
+// الفاتورة - تمثل عملية بيع واحدة
+model Invoice {
+  id            String         @id @default(cuid())
+  invoiceNumber String         @unique // رقم الفاتورة التسلسلي
+  customerName  String?        // اسم الزبون
+  tableNumber   String?        // رقم الطاولة
+  items         InvoiceItem[]
+  subtotal      Float          @default(0) // المجموع قبل الضريبة والخصم
+  taxRate       Float          @default(0) // نسبة الضريبة %
+  taxAmount     Float          @default(0) // مبلغ الضريبة
+  discount      Float          @default(0) // الخصم
+  total         Float          @default(0) // الإجمالي النهائي
+  paidAmount    Float          @default(0) // المبلغ المدفوع
+  change        Float          @default(0) // الباقي للزبون
+  paymentMethod String         @default("cash") // cash, card, transfer
+  status        String         @default("completed") // completed, cancelled, refunded
+  notes         String?        // ملاحظات
+  shift         String?        // الوردية: صباحية، مسائية
+  cashier       String?        // اسم الكاشير
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([createdAt])
+  @@index([status])
+  @@index([paymentMethod])
+}
+
+// بنود الفاتورة - كل بند يمثل طبقاً واحداً بكمية محددة
+model InvoiceItem {
+  id         String    @id @default(cuid())
+  invoiceId  String
+  invoice    Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  menuItemId String?
+  menuItem   MenuItem? @relation(fields: [menuItemId], references: [id])
+  name       String    // اسم البند (نسخة محفوظة من وقت البيع)
+  quantity   Int       @default(1) // الكمية
+  price      Float     // سعر الوحدة وقت البيع
+  total      Float     @default(0) // الإجمالي = الكمية × السعر
+
+  @@index([invoiceId])
+  @@index([menuItemId])
+}
+
+// المصروفات اليومية - اختياري للمطاعم المتوسطة
+model Expense {
+  id          String   @id @default(cuid())
+  category    String   // الفئة: رواتب، إيجار، كهرباء، ماء، مشتريات، أخرى
+  amount      Float     // المبلغ بالجنيه
+  description String?  // الوصف
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@index([date])
+  @@index([category])
+}
