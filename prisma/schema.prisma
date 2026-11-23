@@ -1,11 +1,20 @@
 // Prisma schema for Restaurant Accounting System
 // نظام حسابات مطعم التكية - أبو أمنة الشعبي
+//
+// لدعم PostgreSQL في الإنتاج:
+// 1. غيّر provider من "sqlite" إلى "postgresql"
+// 2. حدّث DATABASE_URL في .env إلى رابط PostgreSQL
+//    مثال: postgresql://user:pass@host:5432/dbname?schema=public
+// 3. شغّل: bun run db:push
+//
+// مزودات مدعومة: sqlite (تطوير), postgresql (إنتاج), mysql
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
+  // استخدم "postgresql" في الإنتاج للإداء العالي والتوسع الأفقي
   provider = "sqlite"
   url      = env("DATABASE_URL")
 }
@@ -322,4 +331,25 @@ model CustomerOrderItem {
 
   @@index([orderId])
   @@index([menuItemId])
+}
+
+// سجل الأحداث الأمنية - Audit Log
+// يسجل كل عملية حساسة لأغراض المراجعة والامتثال
+model AuditLog {
+  id          String   @id @default(cuid())
+  action      String   // login, logout, invoice_create, invoice_cancel, wallet_topup, etc.
+  entityType  String   // user, invoice, customer, purchase, expense, etc.
+  entityId    String?  // معرف الكيان المتأثر
+  description String?  // وصف العملية
+  ipAddress   String?  // عنوان IP لمن قام بالعملية
+  userAgent   String?  // معلومات المتصفح
+  userId      String?  // المستخدم الذي قام بالعملية (إن وجد)
+  metadata    String?  // بيانات إضافية بصيغة JSON
+  status      String   @default("success") // success, failed, error
+  createdAt   DateTime @default(now())
+
+  @@index([action])
+  @@index([entityType])
+  @@index([userId])
+  @@index([createdAt])
 }

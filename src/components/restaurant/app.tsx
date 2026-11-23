@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import {
   LayoutDashboard, Receipt, ShoppingCart, Boxes, Wallet,
-  Truck, BarChart3, Users, Utensils, LogOut, Menu, ChevronLeft, Bell, QrCode, Star,
+  Truck, BarChart3, Users, Utensils, LogOut, Menu, ChevronLeft, Bell, QrCode, Star, Shield,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -24,6 +24,7 @@ import UsersManagement from './users'
 import CustomerOrders from './customer-orders'
 import CustomersManagement from './customers'
 import ReviewsManagement from './reviews'
+import AuditLogView from './audit-log'
 
 export type AppUser = {
   id: string
@@ -44,6 +45,7 @@ type Tab =
   | 'customerOrders'
   | 'customers'
   | 'reviews'
+  | 'audit'
 
 const NAV_SECTIONS: {
   title: string
@@ -77,6 +79,7 @@ const NAV_SECTIONS: {
     title: 'النظام',
     items: [
       { id: 'reports', label: 'التقارير', icon: <BarChart3 className="h-5 w-5" /> },
+      { id: 'audit', label: 'سجل الأحداث', icon: <Shield className="h-5 w-5" /> },
       { id: 'users', label: 'المستخدمون', icon: <Users className="h-5 w-5" />, adminOnly: true },
     ],
   },
@@ -271,6 +274,7 @@ export default function AppClient({ user }: { user: AppUser }) {
             {tab === 'suppliers' && <Suppliers user={user} />}
             {tab === 'reviews' && <ReviewsManagement user={user} />}
             {tab === 'reports' && <Reports />}
+            {tab === 'audit' && user.role !== 'cashier' && <AuditLogView user={user} />}
             {tab === 'users' && user.role === 'admin' && <UsersManagement currentUser={user} />}
           </div>
         </main>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { checkRateLimit, rateLimitResponse, getRateLimitIdentifier } from '@/lib/rate-limit'
 
 // GET /api/public/reviews?menuItemId=xxx - جلب تقييمات طبق (الظاهرة فقط)
 export async function GET(request: NextRequest) {
@@ -49,7 +50,15 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/public/reviews - زبون يضيف تقييماً (بدون مصادقة)
+// مع Rate Limiting: 5 تقييمات/ساعة لكل IP (لمنع الإساءة)
 export async function POST(request: NextRequest) {
+  // فحص Rate Limit - 5 تقييمات/ساعة
+  const identifier = getRateLimitIdentifier(request, 'review')
+  const limit = checkRateLimit(identifier, 5, 60 * 60 * 1000) // 5/ساعة
+  if (!limit.allowed) {
+    return rateLimitResponse(limit.resetTime)
+  }
+
   try {
     const body = await request.json()
     const { menuItemId, customerName, customerPhone, rating, comment } = body

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSessionUser, unauthorizedResponse } from '@/lib/session'
+import { logAudit } from '@/lib/audit'
 
 // توليد رقم فاتورة تسلسلي بصيغة INV-YYYYMMDD-XXX
 async function generateInvoiceNumber(): Promise<string> {
@@ -155,6 +156,16 @@ export async function POST(request: NextRequest) {
         items: { create: invoiceItemsData },
       },
       include: { items: true },
+    })
+
+    // تسجيل إنشاء الفاتورة في سجل الأحداث
+    await logAudit({
+      action: 'invoice_create',
+      entityType: 'invoice',
+      entityId: invoice.id,
+      description: `فاتورة ${invoiceNumber} بقيمة ${total} ج.س`,
+      userId: user.id,
+      metadata: { invoiceNumber, total, paymentMethod },
     })
 
     return NextResponse.json(invoice, { status: 201 })

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSessionUser, unauthorizedResponse, forbiddenResponse } from '@/lib/session'
+import { logAudit } from '@/lib/audit'
 
 // GET /api/users - قائمة المستخدمين (admin فقط)
 export async function GET(request: NextRequest) {
@@ -80,6 +81,16 @@ export async function POST(request: NextRequest) {
         isActive: true,
         createdAt: true,
       },
+    })
+
+    // تسجيل إنشاء مستخدم جديد
+    await logAudit({
+      action: 'user_create',
+      entityType: 'user',
+      entityId: newUser.id,
+      description: `إنشاء مستخدم جديد: ${newUser.username} (${newUser.role})`,
+      userId: user.id,
+      metadata: { username: newUser.username, role: newUser.role },
     })
 
     return NextResponse.json(newUser, { status: 201 })

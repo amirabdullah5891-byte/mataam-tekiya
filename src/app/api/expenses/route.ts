@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSessionUser, unauthorizedResponse, forbiddenResponse } from '@/lib/session'
+import { logAudit } from '@/lib/audit'
 
 // GET /api/expenses - قائمة المصروفات
 export async function GET(request: NextRequest) {
@@ -81,6 +82,16 @@ export async function POST(request: NextRequest) {
         createdById: user.id,
       },
       include: { createdBy: { select: { name: true } } },
+    })
+
+    // تسجيل إضافة مصروف
+    await logAudit({
+      action: 'expense_create',
+      entityType: 'expense',
+      entityId: expense.id,
+      description: `إضافة مصروف ${category}: ${amount} ج.س`,
+      userId: user.id,
+      metadata: { category, amount: Number(amount), description: description?.trim() || null },
     })
 
     return NextResponse.json(expense, { status: 201 })

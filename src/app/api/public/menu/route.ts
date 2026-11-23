@@ -1,9 +1,18 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { RESTAURANT_INFO } from '@/lib/restaurant'
+import { checkRateLimit, rateLimitResponse, getRateLimitIdentifier } from '@/lib/rate-limit'
 
 // GET /api/public/menu - القائمة العامة للزبائن (بدون مصادقة)
-export async function GET() {
+// مع Rate Limiting: 60 طلب/دقيقة لكل IP
+export async function GET(request: Request) {
+  // فحص Rate Limit
+  const identifier = getRateLimitIdentifier(request, 'menu')
+  const limit = checkRateLimit(identifier, 60, 60 * 1000) // 60 طلب/دقيقة
+  if (!limit.allowed) {
+    return rateLimitResponse(limit.resetTime)
+  }
+
   try {
     const items = await db.menuItem.findMany({
       where: {
@@ -34,7 +43,7 @@ export async function GET() {
         : 0
       return {
         ...item,
-        reviews: undefined, // لا نرسل التفاصيل
+        reviews: undefined,
         avgRating: Math.round(avgRating * 10) / 10,
         totalReviews,
       }

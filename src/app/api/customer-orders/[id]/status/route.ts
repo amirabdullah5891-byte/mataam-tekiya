@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSessionUser, unauthorizedResponse } from '@/lib/session'
 import { RESTAURANT_INFO } from '@/lib/restaurant'
+import { logAudit } from '@/lib/audit'
 
 // رسائل SMS حسب حالة الطلب
 function getStatusMessage(status: string, orderNumber: string, total: number): string {
@@ -143,6 +144,16 @@ export async function PUT(
         console.error('Failed to send notification:', e)
       }
     }
+
+    // تسجيل تغيير حالة الطلب
+    await logAudit({
+      action: 'order_status_change',
+      entityType: 'customer_order',
+      entityId: id,
+      description: `تغيير حالة الطلب ${existing.orderNumber} إلى ${status}`,
+      userId: user.id,
+      metadata: { orderNumber: existing.orderNumber, oldStatus: existing.status, newStatus: status, total: existing.total },
+    })
 
     return NextResponse.json(updated)
   } catch (error) {

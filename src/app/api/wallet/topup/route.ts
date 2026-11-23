@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSessionUser, unauthorizedResponse, forbiddenResponse } from '@/lib/session'
+import { logAudit } from '@/lib/audit'
 
 // POST /api/wallet/topup - شحن محفظة زبون
 export async function POST(request: NextRequest) {
@@ -49,6 +50,16 @@ export async function POST(request: NextRequest) {
       })
 
       return { customer: updatedCustomer, transaction }
+    })
+
+    // تسجيل شحن المحفظة (عملية مالية حساسة)
+    await logAudit({
+      action: 'wallet_topup',
+      entityType: 'customer',
+      entityId: customerId,
+      description: `شحن محفظة بمبلغ ${topupAmount} ج.س للزبون ${customer.phone}`,
+      userId: user.id,
+      metadata: { amount: topupAmount, customerId, balanceAfter: result.customer.balance },
     })
 
     return NextResponse.json(result, { status: 201 })

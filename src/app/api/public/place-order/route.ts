@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { checkRateLimit, rateLimitResponse, getRateLimitIdentifier } from '@/lib/rate-limit'
 
 // توليد رقم طلب تسلسلي ORD-YYYYMMDD-XXX
 async function generateOrderNumber(): Promise<string> {
@@ -23,7 +24,15 @@ async function generateOrderNumber(): Promise<string> {
 }
 
 // POST /api/public/place-order - زبون يرسل طلباً جديداً (بدون مصادقة)
+// مع Rate Limiting: 10 طلبات/دقيقة لكل IP (لمنع الإساءة)
 export async function POST(request: NextRequest) {
+  // فحص Rate Limit - 10 طلبات/دقيقة
+  const identifier = getRateLimitIdentifier(request, 'order')
+  const limit = checkRateLimit(identifier, 10, 60 * 1000)
+  if (!limit.allowed) {
+    return rateLimitResponse(limit.resetTime)
+  }
+
   try {
     const body = await request.json()
 

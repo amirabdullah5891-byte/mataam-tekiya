@@ -1,0 +1,9 @@
+{
+  "timestamp": "2026-11-23T12:03:25.303Z",
+  "version": "2.0",
+  "files": [
+    "database.db",
+    "uploads/",
+    "env.backup"
+  ]
+}
