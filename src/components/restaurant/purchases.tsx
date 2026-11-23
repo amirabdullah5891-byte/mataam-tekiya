@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from '@/lib/api-client'
 
 import { useEffect, useState, useCallback } from 'react'
 import {
@@ -69,7 +70,7 @@ export default function Purchases({ user }: { user: AppUser }) {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/purchases?limit=50')
+      const res = await apiFetch('/api/purchases?limit=50')
       const json = await res.json()
       setPurchases(json.purchases || [])
     } catch {
@@ -219,11 +220,11 @@ function NewPurchaseDialog({
 
   useEffect(() => {
     if (open) {
-      fetch('/api/suppliers')
+      apiFetch('/api/suppliers')
         .then(r => r.json())
         .then(json => setSuppliers(json.suppliers || []))
         .catch(() => toast.error('تعذر جلب الموردين'))
-      fetch('/api/inventory?active=true')
+      apiFetch('/api/inventory?active=true')
         .then(r => r.json())
         .then(json => setInventoryItems(json.items || []))
         .catch(() => toast.error('تعذر جلب المخزون'))
@@ -288,7 +289,7 @@ function NewPurchaseDialog({
     }
     setSaving(true)
     try {
-      const res = await fetch('/api/purchases', {
+      const res = await apiFetch('/api/purchases', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from '@/lib/api-client'
 
 import { useEffect, useState, useCallback } from 'react'
 import {
@@ -106,7 +107,7 @@ export default function CustomersManagement({ user }: { user: AppUser }) {
     }
     setTopupSubmitting(true)
     try {
-      const res = await fetch('/api/wallet/topup', {
+      const res = await apiFetch('/api/wallet/topup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -441,7 +442,7 @@ function NewCustomerDialog({
     }
     setSaving(true)
     try {
-      const res = await fetch('/api/customers', {
+      const res = await apiFetch('/api/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

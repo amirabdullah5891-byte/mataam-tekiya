@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from '@/lib/api-client'
 
 import { useEffect, useState, useCallback } from 'react'
 import {
@@ -79,7 +80,7 @@ export default function Expenses({ user }: { user: AppUser }) {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/expenses?limit=100')
+      const res = await apiFetch('/api/expenses?limit=100')
       const json = await res.json()
       setExpenses(json.expenses || [])
       setTotal(json.total || 0)
@@ -328,7 +329,7 @@ function ExpenseDialog({
     }
     setSaving(true)
     try {
-      const res = await fetch('/api/expenses', {
+      const res = await apiFetch('/api/expenses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

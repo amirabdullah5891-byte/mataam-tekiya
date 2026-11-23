@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from '@/lib/api-client'
 
 import { useEffect, useState, useCallback } from 'react'
 import {
@@ -58,7 +59,7 @@ export default function UsersManagement({ currentUser }: { currentUser: AppUser 
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/users')
+      const res = await apiFetch('/api/users')
       if (!res.ok) {
         const json = await res.json()
         throw new Error(json.error)

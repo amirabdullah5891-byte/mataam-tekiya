@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/tabs'
 import { toast } from 'sonner'
 import { RESTAURANT_INFO } from '@/lib/restaurant'
+import { setSessionToken } from '@/lib/api-client'
 
 export default function LoginClient({ needsSetup }: { needsSetup: boolean }) {
   const [tab, setTab] = useState<'login' | 'setup'>(needsSetup ? 'setup' : 'login')
@@ -52,16 +53,21 @@ export default function LoginClient({ needsSetup }: { needsSetup: boolean }) {
         }),
       })
       const json = await res.json()
+      console.log('Login response:', { status: res.status, json })
       if (!res.ok) {
         const errorMsg = json.error || 'فشل في تسجيل الدخول'
         setLoginError(errorMsg)
         throw new Error(errorMsg)
       }
+      // حفظ الـ token في localStorage (يعمل في كل البيئات بما فيها iframe)
+      if (json.token) {
+        setSessionToken(json.token)
+      }
       toast.success('تم تسجيل الدخول بنجاح')
-      // إعادة تحميل الصفحة فوراً لقراءة الجلسة الجديدة
+      // انتظار قصير ثم إعادة تحميل الصفحة
       setTimeout(() => {
-        window.location.reload()
-      }, 300)
+        window.location.href = '/'
+      }, 500)
     } catch (e: any) {
       const msg = e.message || 'حدث خطأ، حاول مرة أخرى'
       setLoginError(msg)

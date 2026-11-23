@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/sheet'
 import { RESTAURANT_INFO } from '@/lib/restaurant'
 import { toast } from 'sonner'
+import { apiFetch, clearSessionToken } from '@/lib/api-client'
 
 import Dashboard from './dashboard'
 import Invoices from './invoices'
@@ -211,13 +212,14 @@ export default function AppClient({ user }: { user: AppUser }) {
 
   const handleSignOut = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' })
+      await apiFetch('/api/auth/logout', { method: 'POST' })
     } catch {
       // تجاهل
     }
+    clearSessionToken()
     toast.success('تم تسجيل الخروج')
     setTimeout(() => {
-      window.location.reload()
+      window.location.href = '/'
     }, 300)
   }
 

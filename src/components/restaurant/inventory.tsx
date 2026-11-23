@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from '@/lib/api-client'
 
 import { useEffect, useState, useCallback } from 'react'
 import {
@@ -72,7 +73,7 @@ export default function Inventory({ user }: { user: AppUser }) {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/inventory')
+      const res = await apiFetch('/api/inventory')
       const json = await res.json()
       setItems(json.items)
       setGrouped(json.grouped)
@@ -88,7 +89,7 @@ export default function Inventory({ user }: { user: AppUser }) {
   const fetchMovements = useCallback(async () => {
     setMovementsLoading(true)
     try {
-      const res = await fetch('/api/inventory/movements?limit=50')
+      const res = await apiFetch('/api/inventory/movements?limit=50')
       const json = await res.json()
       setMovements(json.movements || [])
     } catch {

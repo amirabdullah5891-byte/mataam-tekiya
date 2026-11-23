@@ -1,8 +1,8 @@
-// نظام الجلسة البسيط - بديل موثوق عن NextAuth
-// يستخدم session token مخزن في قاعدة البيانات + cookie
+// نظام الجلسة البسيط - يستخدم قاعدة البيانات + localStorage
+// يعمل في كل البيئات بما فيها iframe (المعاينة)
 import { db } from './db'
 
-export const SESSION_COOKIE_NAME = 'restaurant-session'
+export const SESSION_TOKEN_HEADER = 'x-session-token'
 const SESSION_DURATION = 30 * 24 * 60 * 60 * 1000 // 30 يوماً بالمللي ثانية
 
 // توليد token عشوائي آمن
@@ -12,24 +12,6 @@ function generateToken(): string {
   return Array.from(bytes)
     .map(b => b.toString(16).padStart(2, '0'))
     .join('')
-}
-
-// قراءة قيمة cookie من headers
-function getCookie(request: Request, name: string): string | undefined {
-  const cookieHeader = request.headers.get('cookie') || ''
-  if (!cookieHeader) return undefined
-  const cookies = cookieHeader.split(';')
-  for (const c of cookies) {
-    const trimmed = c.trim()
-    const eqIdx = trimmed.indexOf('=')
-    if (eqIdx === -1) continue
-    const k = trimmed.substring(0, eqIdx)
-    const v = trimmed.substring(eqIdx + 1)
-    if (k === name) {
-      try { return decodeURIComponent(v) } catch { return v }
-    }
-  }
-  return undefined
 }
 
 export type SessionUser = {
@@ -60,10 +42,41 @@ export async function deleteSession(token: string): Promise<void> {
   }
 }
 
-// التحقق من الجلسة وقراءة المستخدم - يستخدم في كل API route
+// قراءة الـ token من request (header أو cookie)
+export function getRequestToken(request: Request): string | null {
+  // 1. محاولة من header المخصص
+  const headerToken = request.headers.get(SESSION_TOKEN_HEADER)
+  if (headerToken) return headerToken
+
+  // 2. محاولة من Authorization header
+  const authHeader = request.headers.get('authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.substring(7)
+  }
+
+  // 3. محاولة من cookie (للتوافق مع الإصدارات السابقة)
+  const cookieHeader = request.headers.get('cookie') || ''
+  if (cookieHeader) {
+    const cookies = cookieHeader.split(';')
+    for (const c of cookies) {
+      const trimmed = c.trim()
+      const eqIdx = trimmed.indexOf('=')
+      if (eqIdx === -1) continue
+      const k = trimmed.substring(0, eqIdx)
+      const v = trimmed.substring(eqIdx + 1)
+      if (k === 'restaurant-session') {
+        try { return decodeURIComponent(v) } catch { return v }
+      }
+    }
+  }
+
+  return null
+}
+
+// التحقق من الجلسة وقراءة المستخدم
 export async function getSessionUser(request: Request): Promise<SessionUser | null> {
   try {
-    const token = getCookie(request, SESSION_COOKIE_NAME)
+    const token = getRequestToken(request)
     if (!token) return null
 
     // البحث عن الجلسة في DB
@@ -103,25 +116,17 @@ export async function getSessionUser(request: Request): Promise<SessionUser | nu
   }
 }
 
-// إنشاء response مع cookie الجلسة
+// إنشاء response مع token (يرجع في body، لا cookie)
 export function createSessionResponse(token: string, body: any, status = 200) {
-  const res = Response.json(body, { status })
-  // إضافة cookie للـ response headers
-  res.headers.set(
-    'Set-Cookie',
-    `${SESSION_COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DURATION / 1000}`
-  )
-  return res
+  return Response.json({
+    ...body,
+    token, // إرجاع الـ token في body ليخزن في localStorage
+  }, { status })
 }
 
-// إنشاء response لحذف الـ cookie (تسجيل خروج)
+// إنشاء response لحذف الجلسة
 export function clearSessionResponse(body: any) {
-  const res = Response.json(body)
-  res.headers.set(
-    'Set-Cookie',
-    `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`
-  )
-  return res
+  return Response.json(body)
 }
 
 export function unauthorizedResponse() {

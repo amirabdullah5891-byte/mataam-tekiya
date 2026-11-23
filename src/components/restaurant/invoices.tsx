@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from '@/lib/api-client'
 
 import { useEffect, useState, useCallback } from 'react'
 import {
@@ -275,7 +276,7 @@ function NewInvoiceDialog({
 
   useEffect(() => {
     if (open) {
-      fetch('/api/menu?active=true')
+      apiFetch('/api/menu?active=true')
         .then(r => r.json())
         .then(json => setMenuItems(json.items || []))
         .catch(() => toast.error('تعذر جلب القائمة'))
@@ -340,7 +341,7 @@ function NewInvoiceDialog({
     }
     setSaving(true)
     try {
-      const res = await fetch('/api/invoices', {
+      const res = await apiFetch('/api/invoices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

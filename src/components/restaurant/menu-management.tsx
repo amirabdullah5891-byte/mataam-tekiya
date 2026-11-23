@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from '@/lib/api-client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import {
@@ -60,7 +61,7 @@ export default function MenuManagement() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/menu')
+      const res = await apiFetch('/api/menu')
       const json = await res.json()
       setItems(json.items)
       setGrouped(json.grouped)
@@ -337,7 +338,7 @@ function MenuItemDialog({
     try {
       const formData = new FormData()
       formData.append('file', file)
-      const res = await fetch('/api/upload', { method: 'POST', body: formData })
+      const res = await apiFetch('/api/upload', { method: 'POST', body: formData })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
       setImageUrl(json.imageUrl)

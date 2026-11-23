@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from '@/lib/api-client'
 
 import { useEffect, useState, useCallback } from 'react'
 import {
@@ -47,7 +48,7 @@ export default function Suppliers({ user }: { user: AppUser }) {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/suppliers')
+      const res = await apiFetch('/api/suppliers')
       const json = await res.json()
       setSuppliers(json.suppliers || [])
     } catch {
