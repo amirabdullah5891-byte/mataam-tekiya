@@ -1,0 +1,50 @@
+{
+  "name": "مطعم التكية - نظام الحسابات",
+  "short_name": "مطعم التكية",
+  "description": "نظام حسابات متكامل لإدارة مبيعات ومشتريات ومخزون مطعم التكية - أبو أمنة الشعبي",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#fff7ed",
+  "theme_color": "#d97706",
+  "categories": ["business", "productivity", "food"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "طلبات الزبائن",
+      "url": "/?tab=customerOrders",
+      "description": "عرض الطلبات الجديدة من الزبائن"
+    },
+    {
+      "name": "فاتورة جديدة",
+      "url": "/?tab=invoices",
+      "description": "إنشاء فاتورة جديدة"
+    },
+    {
+      "name": "المنيو العام",
+      "url": "/menu",
+      "description": "عرض قائمة الطعام للزبائن"
+    },
+    {
+      "name": "طباعة QR Code",
+      "url": "/qrcode",
+      "description": "طباعة بطاقة QR للطاولات"
+    }
+  ]
+}

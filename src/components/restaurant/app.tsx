@@ -25,6 +25,7 @@ import CustomerOrders from './customer-orders'
 import CustomersManagement from './customers'
 import ReviewsManagement from './reviews'
 import AuditLogView from './audit-log'
+import InstallPWAButton from './install-pwa'
 
 export type AppUser = {
   id: string
@@ -279,6 +280,7 @@ export default function AppClient({ user }: { user: AppUser }) {
           </div>
         </main>
       </div>
+      <InstallPWAButton />
     </div>
   )
 }
