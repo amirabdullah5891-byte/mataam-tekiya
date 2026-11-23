@@ -209,9 +209,8 @@ export default function AppClient({ user }: { user: AppUser }) {
   const handleSignOut = async () => {
     await signOut({ redirect: false })
     toast.success('تم تسجيل الخروج')
-    // إعادة تحميل كاملة للصفحة لمسح الجلسة
     setTimeout(() => {
-      window.location.href = '/'
+      window.location.reload()
     }, 300)
   }
 

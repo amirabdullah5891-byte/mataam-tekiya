@@ -50,10 +50,10 @@ export default function LoginClient({ needsSetup }: { needsSetup: boolean }) {
         toast.error('اسم المستخدم أو كلمة المرور غير صحيحة')
       } else {
         toast.success('تم تسجيل الدخول بنجاح')
-        // إعادة تحميل كاملة للصفحة لقراءة الجلسة الجديدة
+        // إعادة تحميل الصفحة فوراً - استخدام reload بدلاً من href لتجنب مشاكل التوجيه
         setTimeout(() => {
-          window.location.href = '/'
-        }, 300)
+          window.location.reload()
+        }, 500)
       }
     } catch {
       toast.error('حدث خطأ، حاول مرة أخرى')
@@ -99,10 +99,10 @@ export default function LoginClient({ needsSetup }: { needsSetup: boolean }) {
         redirect: false,
       })
       if (result && !result.error) {
-        // إعادة تحميل كاملة للصفحة لقراءة الجلسة الجديدة
+        // إعادة تحميل الصفحة فوراً
         setTimeout(() => {
-          window.location.href = '/'
-        }, 300)
+          window.location.reload()
+        }, 500)
       } else {
         setTab('login')
       }

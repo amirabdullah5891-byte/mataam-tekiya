@@ -1,5 +1,5 @@
 // مساعد للتحقق من الجلسة في API routes
-// نقرأ JWT token من cookie ونفك تشفيره يدويًا لتفادي مشاكل getToken مع NextRequest
+// نقرأ JWT token من cookie ونفك تشفيره يدوياً لتفادي مشاكل getToken مع NextRequest
 import { decode } from 'next-auth/jwt'
 import { db } from './db'
 
@@ -10,14 +10,26 @@ export type SessionUser = {
   role: string
 }
 
-// قراءة قيمة cookie من headers
+// قراءة قيمة cookie من headers - تعمل مع جميع أنواع الـ cookies
 function getCookie(request: Request, name: string): string | undefined {
   const cookieHeader = request.headers.get('cookie') || ''
+  if (!cookieHeader) return undefined
+
+  // تقسيم الـ cookies بـ ;
   const cookies = cookieHeader.split(';')
   for (const c of cookies) {
-    const [k, ...v] = c.trim().split('=')
+    const trimmed = c.trim()
+    // البحث عن "name=value"
+    const eqIdx = trimmed.indexOf('=')
+    if (eqIdx === -1) continue
+    const k = trimmed.substring(0, eqIdx)
+    const v = trimmed.substring(eqIdx + 1)
     if (k === name) {
-      return decodeURIComponent(v.join('='))
+      try {
+        return decodeURIComponent(v)
+      } catch {
+        return v
+      }
     }
   }
   return undefined
@@ -26,7 +38,10 @@ function getCookie(request: Request, name: string): string | undefined {
 export async function getSessionUser(request: Request): Promise<SessionUser | null> {
   try {
     const secret = process.env.NEXTAUTH_SECRET
-    if (!secret) return null
+    if (!secret) {
+      console.error('NEXTAUTH_SECRET is not set')
+      return null
+    }
 
     // نحاول أولاً الـ cookie العادي، ثم الـ secure cookie
     const sessionCookie =
