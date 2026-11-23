@@ -6,21 +6,23 @@ import { logAudit, getClientIP, getUserAgent } from '@/lib/audit'
 import { checkRateLimit, rateLimitResponse, getRateLimitIdentifier } from '@/lib/rate-limit'
 
 // POST /api/auth/login - تسجيل الدخول وإنشاء جلسة
-// مع Rate Limiting: 5 محاولات/15 دقيقة لكل IP (لمنع هجمات القوة الغاشمة)
+// مع Rate Limiting للمحاولات الفاشلة فقط (20 محاولة/15 دقيقة)
 export async function POST(request: NextRequest) {
-  // فحص Rate Limit - 5 محاولات كل 15 دقيقة
-  const identifier = getRateLimitIdentifier(request, 'login')
-  const limit = checkRateLimit(identifier, 5, 15 * 60 * 1000) // 5/15min
-  if (!limit.allowed) {
-    return rateLimitResponse(limit.resetTime)
-  }
-
   try {
     const body = await request.json()
     const { username, password } = body
 
     if (!username || !password) {
       return Response.json({ error: 'اسم المستخدم وكلمة المرور مطلوبان' }, { status: 400 })
+    }
+
+    // فحص Rate Limit - 20 محاولة كل 15 دقيقة (مقبول للمستخدمين الحقيقيين)
+    const identifier = getRateLimitIdentifier(request, 'login')
+    const limit = checkRateLimit(identifier, 20, 15 * 60 * 1000)
+    if (!limit.allowed) {
+      return Response.json({
+        error: `تجاوزت الحد المسموح من المحاولات. حاول مرة أخرى بعد ${Math.ceil((limit.resetTime - Date.now()) / 60 / 1000)} دقيقة`,
+      }, { status: 429 })
     }
 
     const user = await db.user.findUnique({

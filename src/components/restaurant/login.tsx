@@ -24,6 +24,7 @@ export default function LoginClient({ needsSetup }: { needsSetup: boolean }) {
   const [loginUsername, setLoginUsername] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
   const [loginLoading, setLoginLoading] = useState(false)
+  const [loginError, setLoginError] = useState<string | null>(null)
 
   // حقول الإعداد الأولي (إنشاء أول admin)
   const [setupName, setSetupName] = useState('')
@@ -35,10 +36,12 @@ export default function LoginClient({ needsSetup }: { needsSetup: boolean }) {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!loginUsername.trim() || !loginPassword) {
+      setLoginError('أدخل اسم المستخدم وكلمة المرور')
       toast.error('أدخل اسم المستخدم وكلمة المرور')
       return
     }
     setLoginLoading(true)
+    setLoginError(null)
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -50,7 +53,9 @@ export default function LoginClient({ needsSetup }: { needsSetup: boolean }) {
       })
       const json = await res.json()
       if (!res.ok) {
-        throw new Error(json.error || 'فشل في تسجيل الدخول')
+        const errorMsg = json.error || 'فشل في تسجيل الدخول'
+        setLoginError(errorMsg)
+        throw new Error(errorMsg)
       }
       toast.success('تم تسجيل الدخول بنجاح')
       // إعادة تحميل الصفحة فوراً لقراءة الجلسة الجديدة
@@ -58,7 +63,9 @@ export default function LoginClient({ needsSetup }: { needsSetup: boolean }) {
         window.location.reload()
       }, 300)
     } catch (e: any) {
-      toast.error(e.message || 'حدث خطأ، حاول مرة أخرى')
+      const msg = e.message || 'حدث خطأ، حاول مرة أخرى'
+      setLoginError(msg)
+      toast.error(msg)
     } finally {
       setLoginLoading(false)
     }
@@ -167,6 +174,12 @@ export default function LoginClient({ needsSetup }: { needsSetup: boolean }) {
 
               <TabsContent value="login" className="m-0">
                 <form onSubmit={handleLogin} className="space-y-4">
+                  {loginError && (
+                    <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm flex items-start gap-2">
+                      <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                      <span>{loginError}</span>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label htmlFor="username">اسم المستخدم</Label>
                     <div className="relative">
