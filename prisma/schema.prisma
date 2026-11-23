@@ -27,6 +27,21 @@ model User {
   invoices           Invoice[]
   walletTopups       WalletTransaction[]
   acceptedOrders     CustomerOrder[]
+  sessions           Session[]
+}
+
+// جلسات تسجيل الدخول - بديل موثوق عن NextAuth JWT
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique // session token عشوائي
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 // عناصر قائمة الطعام - الأطباق والمشروبات المتاحة للبيع

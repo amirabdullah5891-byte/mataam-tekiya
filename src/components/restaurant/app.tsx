@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { signOut } from 'next-auth/react'
 import {
   LayoutDashboard, Receipt, ShoppingCart, Boxes, Wallet,
   Truck, BarChart3, Users, Utensils, LogOut, Menu, ChevronLeft, Bell, QrCode, Star,
@@ -207,7 +206,11 @@ export default function AppClient({ user }: { user: AppUser }) {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   const handleSignOut = async () => {
-    await signOut({ redirect: false })
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+    } catch {
+      // تجاهل
+    }
     toast.success('تم تسجيل الخروج')
     setTimeout(() => {
       window.location.reload()

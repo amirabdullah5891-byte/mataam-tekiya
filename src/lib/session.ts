@@ -1,7 +1,36 @@
-// مساعد للتحقق من الجلسة في API routes
-// نقرأ JWT token من cookie ونفك تشفيره يدوياً لتفادي مشاكل getToken مع NextRequest
-import { decode } from 'next-auth/jwt'
+// نظام الجلسة البسيط - بديل موثوق عن NextAuth
+// يستخدم session token مخزن في قاعدة البيانات + cookie
 import { db } from './db'
+
+export const SESSION_COOKIE_NAME = 'restaurant-session'
+const SESSION_DURATION = 30 * 24 * 60 * 60 * 1000 // 30 يوماً بالمللي ثانية
+
+// توليد token عشوائي آمن
+function generateToken(): string {
+  const bytes = new Uint8Array(32)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+// قراءة قيمة cookie من headers
+function getCookie(request: Request, name: string): string | undefined {
+  const cookieHeader = request.headers.get('cookie') || ''
+  if (!cookieHeader) return undefined
+  const cookies = cookieHeader.split(';')
+  for (const c of cookies) {
+    const trimmed = c.trim()
+    const eqIdx = trimmed.indexOf('=')
+    if (eqIdx === -1) continue
+    const k = trimmed.substring(0, eqIdx)
+    const v = trimmed.substring(eqIdx + 1)
+    if (k === name) {
+      try { return decodeURIComponent(v) } catch { return v }
+    }
+  }
+  return undefined
+}
 
 export type SessionUser = {
   id: string
@@ -10,77 +39,89 @@ export type SessionUser = {
   role: string
 }
 
-// قراءة قيمة cookie من headers - تعمل مع جميع أنواع الـ cookies
-function getCookie(request: Request, name: string): string | undefined {
-  const cookieHeader = request.headers.get('cookie') || ''
-  if (!cookieHeader) return undefined
+// إنشاء جلسة جديدة للمستخدم - تُرجع الـ token
+export async function createSession(userId: string): Promise<string> {
+  const token = generateToken()
+  const expiresAt = new Date(Date.now() + SESSION_DURATION)
 
-  // تقسيم الـ cookies بـ ;
-  const cookies = cookieHeader.split(';')
-  for (const c of cookies) {
-    const trimmed = c.trim()
-    // البحث عن "name=value"
-    const eqIdx = trimmed.indexOf('=')
-    if (eqIdx === -1) continue
-    const k = trimmed.substring(0, eqIdx)
-    const v = trimmed.substring(eqIdx + 1)
-    if (k === name) {
-      try {
-        return decodeURIComponent(v)
-      } catch {
-        return v
-      }
-    }
-  }
-  return undefined
+  await db.session.create({
+    data: { token, userId, expiresAt },
+  })
+
+  return token
 }
 
+// حذف جلسة (تسجيل خروج)
+export async function deleteSession(token: string): Promise<void> {
+  try {
+    await db.session.deleteMany({ where: { token } })
+  } catch {
+    // تجاهل
+  }
+}
+
+// التحقق من الجلسة وقراءة المستخدم - يستخدم في كل API route
 export async function getSessionUser(request: Request): Promise<SessionUser | null> {
   try {
-    const secret = process.env.NEXTAUTH_SECRET
-    if (!secret) {
-      console.error('NEXTAUTH_SECRET is not set')
-      return null
-    }
+    const token = getCookie(request, SESSION_COOKIE_NAME)
+    if (!token) return null
 
-    // نحاول أولاً الـ cookie العادي، ثم الـ secure cookie
-    const sessionCookie =
-      getCookie(request, 'next-auth.session-token') ||
-      getCookie(request, '__Secure-next-auth.session-token')
-
-    if (!sessionCookie) return null
-
-    // فك تشفير الـ JWT
-    const token = await decode({
-      token: sessionCookie,
-      secret,
-    })
-
-    if (!token?.id) return null
-
-    const user = await db.user.findUnique({
-      where: { id: token.id as string },
-      select: {
-        id: true,
-        username: true,
-        name: true,
-        role: true,
-        isActive: true,
+    // البحث عن الجلسة في DB
+    const session = await db.session.findUnique({
+      where: { token },
+      include: {
+        user: {
+          select: { id: true, username: true, name: true, role: true, isActive: true },
+        },
       },
     })
 
-    if (!user || !user.isActive) return null
+    // الجلسة غير موجودة
+    if (!session) return null
+
+    // الجلسة منتهية الصلاحية
+    if (session.expiresAt < new Date()) {
+      await db.session.delete({ where: { id: session.id } }).catch(() => {})
+      return null
+    }
+
+    // المستخدم غير نشط
+    if (!session.user.isActive) {
+      await db.session.delete({ where: { id: session.id } }).catch(() => {})
+      return null
+    }
 
     return {
-      id: user.id,
-      username: user.username,
-      name: user.name,
-      role: user.role,
+      id: session.user.id,
+      username: session.user.username,
+      name: session.user.name,
+      role: session.user.role,
     }
   } catch (e) {
     console.error('getSessionUser error:', e)
     return null
   }
+}
+
+// إنشاء response مع cookie الجلسة
+export function createSessionResponse(token: string, body: any, status = 200) {
+  const res = Response.json(body, { status })
+  // إضافة cookie للـ response headers
+  res.headers.set(
+    'Set-Cookie',
+    `${SESSION_COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DURATION / 1000}`
+  )
+  return res
+}
+
+// إنشاء response لحذف الـ cookie (تسجيل خروج)
+export function clearSessionResponse(body: any) {
+  const res = Response.json(body)
+  res.headers.set(
+    'Set-Cookie',
+    `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`
+  )
+  return res
 }
 
 export function unauthorizedResponse() {

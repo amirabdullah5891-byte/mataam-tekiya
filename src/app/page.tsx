@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { SessionProvider } from 'next-auth/react'
 import LoginClient from '@/components/restaurant/login'
 import AppClient, { type AppUser } from '@/components/restaurant/app'
 import { Loader2 } from 'lucide-react'

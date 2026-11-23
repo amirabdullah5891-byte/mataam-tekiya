@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { signIn } from 'next-auth/react'
 import {
   Utensils, User, Lock, Loader2, LogIn, MapPin, Phone,
   AlertCircle, KeyRound, UserPlus,
@@ -41,22 +40,25 @@ export default function LoginClient({ needsSetup }: { needsSetup: boolean }) {
     }
     setLoginLoading(true)
     try {
-      const result = await signIn('credentials', {
-        username: loginUsername.trim(),
-        password: loginPassword,
-        redirect: false,
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: loginUsername.trim(),
+          password: loginPassword,
+        }),
       })
-      if (result?.error) {
-        toast.error('اسم المستخدم أو كلمة المرور غير صحيحة')
-      } else {
-        toast.success('تم تسجيل الدخول بنجاح')
-        // إعادة تحميل الصفحة فوراً - استخدام reload بدلاً من href لتجنب مشاكل التوجيه
-        setTimeout(() => {
-          window.location.reload()
-        }, 500)
+      const json = await res.json()
+      if (!res.ok) {
+        throw new Error(json.error || 'فشل في تسجيل الدخول')
       }
-    } catch {
-      toast.error('حدث خطأ، حاول مرة أخرى')
+      toast.success('تم تسجيل الدخول بنجاح')
+      // إعادة تحميل الصفحة فوراً لقراءة الجلسة الجديدة
+      setTimeout(() => {
+        window.location.reload()
+      }, 300)
+    } catch (e: any) {
+      toast.error(e.message || 'حدث خطأ، حاول مرة أخرى')
     } finally {
       setLoginLoading(false)
     }
@@ -93,16 +95,18 @@ export default function LoginClient({ needsSetup }: { needsSetup: boolean }) {
       }
       toast.success('تم إنشاء حساب المدير، يمكنك تسجيل الدخول الآن')
       // تسجيل الدخول مباشرة
-      const result = await signIn('credentials', {
-        username: setupUsername.trim(),
-        password: setupPassword,
-        redirect: false,
+      const loginRes = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: setupUsername.trim(),
+          password: setupPassword,
+        }),
       })
-      if (result && !result.error) {
-        // إعادة تحميل الصفحة فوراً
+      if (loginRes.ok) {
         setTimeout(() => {
           window.location.reload()
-        }, 500)
+        }, 300)
       } else {
         setTab('login')
       }
