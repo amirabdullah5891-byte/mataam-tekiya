@@ -255,7 +255,7 @@ function SupplierDialog({
       }
       const url = supplier ? `/api/suppliers/${supplier.id}` : '/api/suppliers'
       const method = supplier ? 'PUT' : 'POST'
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

@@ -408,7 +408,7 @@ function InventoryDialog({
       }
       const url = item ? `/api/inventory/${item.id}` : '/api/inventory'
       const method = item ? 'PUT' : 'POST'
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

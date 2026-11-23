@@ -70,7 +70,7 @@ export default function CustomersManagement({ user }: { user: AppUser }) {
     setLoading(true)
     try {
       const url = `/api/customers${search ? `?search=${encodeURIComponent(search)}` : ''}`
-      const res = await fetch(url)
+      const res = await apiFetch(url)
       const json = await res.json()
       setCustomers(json.customers || [])
     } catch {

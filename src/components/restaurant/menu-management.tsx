@@ -371,7 +371,7 @@ function MenuItemDialog({
       }
       const url = item ? `/api/menu/${item.id}` : '/api/menu'
       const method = item ? 'PUT' : 'POST'
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

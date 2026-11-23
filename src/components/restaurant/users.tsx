@@ -312,7 +312,7 @@ function UserDialog({
 
       const url = user ? `/api/users/${user.id}` : '/api/users'
       const method = user ? 'PUT' : 'POST'
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
