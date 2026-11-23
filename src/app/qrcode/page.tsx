@@ -198,10 +198,13 @@ export default function QRCodePage() {
             <li>يصلك الطلب في تبويب "طلبات الزبائن" بالإدارة</li>
             <li>يمكن للزبون شحن محفظته مسبقاً والدفع منها</li>
           </ol>
-          <div className="mt-3 p-2 bg-amber-50 text-amber-800 rounded text-xs">
-            <strong>ملاحظة مهمة:</strong> لكي يعمل الرابط على هواتف الزبائن،
-            يجب أن يكون هذا النظام منشوراً على إنترنت عام (مثل Vercel أو VPS).
-            الرابط الحالي يعمل فقط على نفس الشبكة.
+          <div className="mt-3 p-2 bg-emerald-50 text-emerald-800 rounded text-xs">
+            <strong>✓ يعمل على الشبكة المحلية:</strong> إذا كان الكمبيوتر والهاتف على نفس شبكة WiFi،
+            امسح الرمز وستفتح القائمة مباشرة. لا حاجة لإنترنت خارجي.
+          </div>
+          <div className="mt-2 p-2 bg-amber-50 text-amber-800 rounded text-xs">
+            <strong>للوصول من خارج المطعم:</strong> يجب نشر النظام على Vercel أو VPS
+            (راجع دليل النشر).
           </div>
         </div>
       </div>
