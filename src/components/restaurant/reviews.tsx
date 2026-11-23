@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from '@/lib/api-client'
 
 import { useEffect, useState, useCallback } from 'react'
 import {
@@ -56,7 +57,7 @@ export default function ReviewsManagement({ user }: { user: AppUser }) {
     setLoading(true)
     try {
       const hiddenParam = filter === 'all' ? '' : `?hidden=${filter === 'hidden'}`
-      const res = await fetch(`/api/reviews${hiddenParam}`)
+      const res = await apiFetch(`/api/reviews${hiddenParam}`)
       const json = await res.json()
       setReviews(json.reviews || [])
       setStats(json.stats || { total: 0, avgRating: 0, hidden: 0 })
@@ -72,7 +73,7 @@ export default function ReviewsManagement({ user }: { user: AppUser }) {
 
   const toggleHide = async (review: Review) => {
     try {
-      const res = await fetch(`/api/reviews/${review.id}`, {
+      const res = await apiFetch(`/api/reviews/${review.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isHidden: !review.isHidden }),
@@ -88,7 +89,7 @@ export default function ReviewsManagement({ user }: { user: AppUser }) {
   const handleDelete = async (review: Review) => {
     if (!confirm('حذف هذا التقييم نهائياً؟')) return
     try {
-      const res = await fetch(`/api/reviews/${review.id}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/reviews/${review.id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error()
       toast.success('تم حذف التقييم')
       fetchData()

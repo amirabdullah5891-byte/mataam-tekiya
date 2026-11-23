@@ -259,7 +259,7 @@ export default function MenuManagement() {
               onClick={async () => {
                 if (!deleteTarget) return
                 try {
-                  const res = await fetch(`/api/menu/${deleteTarget.id}`, { method: 'DELETE' })
+                  const res = await apiFetch(`/api/menu/${deleteTarget.id}`, { method: 'DELETE' })
                   if (!res.ok) throw new Error()
                   toast.success('تم تعطيل العنصر')
                   fetchData()

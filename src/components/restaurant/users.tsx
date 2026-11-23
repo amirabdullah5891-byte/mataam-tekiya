@@ -77,7 +77,7 @@ export default function UsersManagement({ currentUser }: { currentUser: AppUser 
 
   const handleToggleActive = async (user: UserRow) => {
     try {
-      const res = await fetch(`/api/users/${user.id}`, {
+      const res = await apiFetch(`/api/users/${user.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isActive: !user.isActive }),

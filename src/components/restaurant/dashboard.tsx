@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from '@/lib/api-client'
 
 import { useEffect, useState, useCallback } from 'react'
 import {
@@ -73,7 +74,7 @@ export default function Dashboard({ user }: { user: AppUser }) {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/dashboard?range=${range}`)
+      const res = await apiFetch(`/api/dashboard?range=${range}`)
       if (!res.ok) throw new Error('فشل')
       const json = await res.json()
       setData(json)

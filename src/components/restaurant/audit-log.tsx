@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { apiFetch } from '@/lib/api-client'
 import {
   Shield, Loader2, LogIn, LogOut, Receipt, Wallet, ShoppingCart,
   Users, Eye, RefreshCw, AlertCircle,
@@ -60,7 +61,7 @@ export default function AuditLogView({ user }: { user: AppUser }) {
     setLoading(true)
     try {
       const url = `/api/audit${filter !== 'all' ? `?action=${filter}` : ''}`
-      const res = await fetch(url)
+      const res = await apiFetch(url)
       if (!res.ok) {
         const json = await res.json()
         throw new Error(json.error || 'فشل')

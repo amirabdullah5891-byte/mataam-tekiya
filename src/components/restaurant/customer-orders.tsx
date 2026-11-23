@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from '@/lib/api-client'
 
 import { useEffect, useState, useCallback } from 'react'
 import {
@@ -90,7 +91,7 @@ export default function CustomerOrders({ user }: { user: AppUser }) {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/customer-orders?status=${statusFilter}&limit=50`)
+      const res = await apiFetch(`/api/customer-orders?status=${statusFilter}&limit=50`)
       const json = await res.json()
       setOrders(json.orders || [])
       setStats(json.stats || {})
@@ -111,7 +112,7 @@ export default function CustomerOrders({ user }: { user: AppUser }) {
   const updateStatus = async (orderId: string, newStatus: string) => {
     setUpdating(true)
     try {
-      const res = await fetch(`/api/customer-orders/${orderId}/status`, {
+      const res = await apiFetch(`/api/customer-orders/${orderId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),

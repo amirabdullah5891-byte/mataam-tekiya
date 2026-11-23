@@ -1,4 +1,5 @@
 'use client'
+import { apiFetch } from '@/lib/api-client'
 
 import { useEffect, useState, useCallback } from 'react'
 import {
@@ -64,7 +65,7 @@ export default function Reports() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/reports?from=${from}&to=${to}`)
+      const res = await apiFetch(`/api/reports?from=${from}&to=${to}`)
       if (!res.ok) throw new Error()
       const json = await res.json()
       setData(json)

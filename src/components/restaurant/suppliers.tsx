@@ -189,7 +189,7 @@ export default function Suppliers({ user }: { user: AppUser }) {
               onClick={async () => {
                 if (!deleteTarget) return
                 try {
-                  const res = await fetch(`/api/suppliers/${deleteTarget.id}`, { method: 'DELETE' })
+                  const res = await apiFetch(`/api/suppliers/${deleteTarget.id}`, { method: 'DELETE' })
                   const json = await res.json()
                   if (!res.ok) throw new Error(json.error)
                   toast.success('تم حذف المورد')

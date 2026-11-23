@@ -84,7 +84,7 @@ export default function CustomersManagement({ user }: { user: AppUser }) {
 
   const viewCustomerDetails = async (customer: Customer) => {
     try {
-      const res = await fetch(`/api/customers/${customer.id}`)
+      const res = await apiFetch(`/api/customers/${customer.id}`)
       const json = await res.json()
       setViewCustomer(json.customer)
     } catch {

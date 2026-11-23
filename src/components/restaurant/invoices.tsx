@@ -84,7 +84,7 @@ export default function Invoices({ user }: { user: AppUser }) {
   const fetchInvoices = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/invoices?status=${statusFilter}&limit=50`)
+      const res = await apiFetch(`/api/invoices?status=${statusFilter}&limit=50`)
       const json = await res.json()
       setInvoices(json.invoices || [])
     } catch {
@@ -111,7 +111,7 @@ export default function Invoices({ user }: { user: AppUser }) {
   const handleCancel = async (invoice: Invoice) => {
     if (!confirm(`إلغاء الفاتورة ${invoice.invoiceNumber}؟`)) return
     try {
-      const res = await fetch(`/api/invoices/${invoice.id}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/invoices/${invoice.id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error()
       toast.success('تم إلغاء الفاتورة')
       fetchInvoices()

@@ -281,7 +281,7 @@ export default function Expenses({ user }: { user: AppUser }) {
               onClick={async () => {
                 if (!deleteTarget) return
                 try {
-                  const res = await fetch(`/api/expenses/${deleteTarget.id}`, { method: 'DELETE' })
+                  const res = await apiFetch(`/api/expenses/${deleteTarget.id}`, { method: 'DELETE' })
                   if (!res.ok) throw new Error()
                   toast.success('تم حذف المصروف')
                   fetchData()
