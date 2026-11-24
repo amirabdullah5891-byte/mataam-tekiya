@@ -87,8 +87,24 @@ async function main() {
     log('   سيتم ترحيل البيانات إلى PostgreSQL', colors.blue)
   }
 
-  // 3. تثبيت Prisma وإنشاء العميل
-  log('\n📋 الخطوة 3: تحديث Prisma Client...', colors.yellow)
+  // 3. تبديل المزود إلى PostgreSQL في schema.prisma
+  log('\n📋 الخطوة 3: تبديل المزود إلى PostgreSQL...', colors.yellow)
+  try {
+    const schemaPath = path.join(PROJECT_DIR, 'prisma', 'schema.prisma')
+    const schema = readFileSync(schemaPath, 'utf-8')
+    const newSchema = schema.replace(
+      /provider\s*=\s*"(sqlite|mysql|postgresql)"/,
+      'provider = "postgresql"'
+    )
+    writeFileSync(schemaPath, newSchema)
+    log('✅ تم تبديل المزود إلى PostgreSQL', colors.green)
+  } catch (e) {
+    log('❌ فشل تبديل المزود', colors.red)
+    process.exit(1)
+  }
+
+  // 4. تحديث Prisma Client
+  log('\n📋 الخطوة 4: تحديث Prisma Client...', colors.yellow)
   try {
     execSync('bun run db:generate', { stdio: 'inherit', cwd: PROJECT_DIR })
     log('✅ تم تحديث Prisma Client', colors.green)
@@ -97,8 +113,8 @@ async function main() {
     process.exit(1)
   }
 
-  // 4. فحص الاتصال بـ PostgreSQL وإنشاء الجداول
-  log('\n📋 الخطوة 4: فحص الاتصال وإنشاء الجداول في PostgreSQL...', colors.yellow)
+  // 5. فحص الاتصال بـ PostgreSQL وإنشاء الجداول
+  log('\n📋 الخطوة 5: فحص الاتصال وإنشاء الجداول في PostgreSQL...', colors.yellow)
   try {
     execSync('bun run db:push', { stdio: 'inherit', cwd: PROJECT_DIR })
     log('✅ تم إنشاء الجداول في PostgreSQL', colors.green)
@@ -118,9 +134,9 @@ async function main() {
     process.exit(1)
   }
 
-  // 5. ترحيل البيانات من SQLite
+  // 6. ترحيل البيانات من SQLite
   if (existsSync(SQLITE_DB)) {
-    log('\n📋 الخطوة 5: ترحيل البيانات من SQLite إلى PostgreSQL...', colors.yellow)
+    log('\n📋 الخطوة 6: ترحيل البيانات من SQLite إلى PostgreSQL...', colors.yellow)
     try {
       // نسخ احتياطي قبل الترحيل
       log('   إنشاء نسخة احتياطية...', colors.blue)
@@ -137,8 +153,8 @@ async function main() {
     }
   }
 
-  // 6. التحقق من النجاح
-  log('\n📋 الخطوة 6: التحقق من النجاح...', colors.yellow)
+  // 7. التحقق من النجاح
+  log('\n📋 الخطوة 7: التحقق من النجاح...', colors.yellow)
   try {
     // محاولة قراءة عدد المستخدمين عبر سكريبت بسيط
     const checkScript = `

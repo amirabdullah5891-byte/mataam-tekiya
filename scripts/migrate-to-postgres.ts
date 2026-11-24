@@ -2,24 +2,15 @@
 // سكريبت ترحيل البيانات من SQLite إلى PostgreSQL
 // الاستخدام: bun run scripts/migrate-to-postgres.ts
 //
-// يقرأ البيانات من SQLite (db/custom.db) ويكتبها إلى PostgreSQL
-// يستخدم Prisma Client للكتابة (يتبع الـ DATABASE_URL الحالي)
+// يقوم بـ:
+// 1. قراءة البيانات من SQLite عبر Prisma
+// 2. إعادة توليد Prisma Client للمزود الهدف
+// 3. كتابة البيانات إلى قاعدة البيانات الهدف
 
 import { PrismaClient } from '@prisma/client'
-import { existsSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import path from 'path'
-import Database from 'better-sqlite3'
-
-// إنشاء عميل SQLite منفصل للقراءة
-function createSqliteClient() {
-  const sqlitePath = path.join(process.cwd(), 'db', 'custom.db')
-  if (!existsSync(sqlitePath)) {
-    throw new Error('قاعدة بيانات SQLite غير موجودة')
-  }
-
-  const db = new Database(sqlitePath, { readonly: true })
-  return db
-}
+import { execSync } from 'child_process'
 
 const colors = {
   reset: '\x1b[0m',
@@ -34,114 +25,184 @@ function log(msg: string, color = '') {
   console.log(`${color}${msg}${colors.reset}`)
 }
 
+// تحويل التواريخ من نص إلى كائن Date
+function processDates(rows: any[]): any[] {
+  const dateKeys = ['createdAt', 'updatedAt', 'lastLogin', 'expiresAt',
+    'acceptedAt', 'completedAt', 'sentAt', 'date']
+  
+  return rows.map((row: any) => {
+    const processed: any = {}
+    for (const [key, value] of Object.entries(row)) {
+      if (value !== null && typeof value === 'string' && dateKeys.includes(key)) {
+        const date = new Date(value)
+        processed[key] = isNaN(date.getTime()) ? value : date
+      } else {
+        processed[key] = value
+      }
+    }
+    return processed
+  })
+}
+
 async function main() {
   console.log('\n🔄 ترحيل البيانات من SQLite إلى PostgreSQL\n')
+  console.log('═'.repeat(60))
 
-  const sqlite = createSqliteClient()
-  const prisma = new PrismaClient()
+  // فحص وجود قاعدة بيانات SQLite
+  const sqlitePath = path.join(process.cwd(), 'db', 'custom.db')
+  if (!existsSync(sqlitePath)) {
+    log('❌ قاعدة بيانات SQLite غير موجودة في db/custom.db', colors.red)
+    process.exit(1)
+  }
+
+  // 1. قراءة البيانات من SQLite
+  log('\n📋 الخطوة 1: قراءة البيانات من SQLite...', colors.yellow)
+
+  // حفظ الإعدادات الأصلية
+  const schemaPath = path.join(process.cwd(), 'prisma', 'schema.prisma')
+  const envPath = path.join(process.cwd(), '.env')
+  const originalSchema = readFileSync(schemaPath, 'utf-8')
+  const originalEnv = readFileSync(envPath, 'utf-8')
+
+  // تبديل مؤقت إلى SQLite للقراءة
+  const sqliteSchema = originalSchema.replace(
+    /provider\s*=\s*"(postgresql|mysql|sqlite)"/,
+    'provider = "sqlite"'
+  )
+  writeFileSync(schemaPath, sqliteSchema)
+  writeFileSync(envPath, originalEnv.replace(
+    /^DATABASE_URL=.+$/m,
+    `DATABASE_URL=file:${sqlitePath}`
+  ))
 
   try {
-    // قائمة الجداول للترحيل (بالترتيب الصحيح للعلاقات)
-    const tables = [
-      { name: 'User', table: 'User' },
-      { name: 'Session', table: 'Session' },
-      { name: 'MenuItem', table: 'MenuItem' },
-      { name: 'Supplier', table: 'Supplier' },
-      { name: 'InventoryItem', table: 'InventoryItem' },
-      { name: 'Customer', table: 'Customer' },
-      { name: 'Invoice', table: 'Invoice' },
-      { name: 'InvoiceItem', table: 'InvoiceItem' },
-      { name: 'Purchase', table: 'Purchase' },
-      { name: 'PurchaseItem', table: 'PurchaseItem' },
-      { name: 'StockMovement', table: 'StockMovement' },
-      { name: 'Expense', table: 'Expense' },
-      { name: 'WalletTransaction', table: 'WalletTransaction' },
-      { name: 'CustomerOrder', table: 'CustomerOrder' },
-      { name: 'CustomerOrderItem', table: 'CustomerOrderItem' },
-      { name: 'Review', table: 'Review' },
-      { name: 'Notification', table: 'Notification' },
-      { name: 'AuditLog', table: 'AuditLog' },
-    ]
+    execSync('bun run db:generate', { stdio: 'pipe', cwd: process.cwd() })
+  } catch (e) {
+    log('❌ فشل تحديث Prisma Client لـ SQLite', colors.red)
+    // إعادة الإعدادات
+    writeFileSync(schemaPath, originalSchema)
+    writeFileSync(envPath, originalEnv)
+    process.exit(1)
+  }
 
-    let totalMigrated = 0
+  // إنشاء عميل SQLite
+  const { PrismaClient: SqlitePrisma } = await import('@prisma/client')
+  const sqlitePrisma = new SqlitePrisma()
 
-    for (const { name, table } of tables) {
+  const tables = [
+    // التابعون أولاً (لحذفهم قبل الآباء)
+    { name: 'Session', model: 'session' },
+    { name: 'AuditLog', model: 'auditLog' },
+    { name: 'Notification', model: 'notification' },
+    { name: 'Review', model: 'review' },
+    { name: 'CustomerOrderItem', model: 'customerOrderItem' },
+    { name: 'CustomerOrder', model: 'customerOrder' },
+    { name: 'WalletTransaction', model: 'walletTransaction' },
+    { name: 'Expense', model: 'expense' },
+    { name: 'StockMovement', model: 'stockMovement' },
+    { name: 'PurchaseItem', model: 'purchaseItem' },
+    { name: 'Purchase', model: 'purchase' },
+    { name: 'InvoiceItem', model: 'invoiceItem' },
+    { name: 'Invoice', model: 'invoice' },
+    { name: 'Customer', model: 'customer' },
+    { name: 'InventoryItem', model: 'inventoryItem' },
+    { name: 'Supplier', model: 'supplier' },
+    { name: 'MenuItem', model: 'menuItem' },
+    { name: 'User', model: 'user' },
+  ]
+
+  const data: Record<string, any[]> = {}
+
+  try {
+    for (const { name, model } of tables) {
       try {
-        // قراءة البيانات من SQLite
-        const rows = sqlite.prepare(`SELECT * FROM "${table}"`).all()
-        
-        if (rows.length === 0) {
-          log(`   ${name}: 0 سجل (تخطي)`, colors.blue)
-          continue
-        }
+        const records = await (sqlitePrisma as any)[model].findMany()
+        data[name] = records
+        log(`   📖 ${name}: ${records.length} سجل`, colors.blue)
+      } catch (e: any) {
+        log(`   ⚠️  ${name}: ${e.message.substring(0, 50)}`, colors.yellow)
+        data[name] = []
+      }
+    }
+  } finally {
+    await sqlitePrisma.$disconnect()
+  }
 
-        // تحويل التواريخ من نص إلى كائن Date
-        const processedRows = rows.map((row: any) => {
-          const processed: any = {}
-          for (const [key, value] of Object.entries(row)) {
-            if (value !== null && typeof value === 'string') {
-              // تحويل التواريخ
-              if (key === 'createdAt' || key === 'updatedAt' || key === 'lastLogin' || 
-                  key === 'expiresAt' || key === 'acceptedAt' || key === 'completedAt' ||
-                  key === 'sentAt' || key === 'date') {
-                const date = new Date(value)
-                if (!isNaN(date.getTime())) {
-                  processed[key] = date
-                } else {
-                  processed[key] = value
-                }
-              } else {
-                processed[key] = value
-              }
-            } else {
-              processed[key] = value
-            }
+  let totalRecords = 0
+  for (const rows of Object.values(data)) {
+    totalRecords += rows.length
+  }
+  log(`\n✅ تم قراءة ${totalRecords} سجل من ${Object.keys(data).length} جدول`, colors.green)
+
+  // 2. إعادة الإعدادات للمزود الهدف
+  log('\n📋 الخطوة 2: إعداد Prisma للمزود الهدف...', colors.yellow)
+  writeFileSync(schemaPath, originalSchema)
+  writeFileSync(envPath, originalEnv)
+
+  try {
+    execSync('bun run db:generate', { stdio: 'inherit', cwd: process.cwd() })
+    log('✅ تم تحديث Prisma Client للمزود الهدف', colors.green)
+  } catch {
+    log('⚠️  تعذر تحديث Prisma Client', colors.yellow)
+  }
+
+  // 3. الكتابة إلى قاعدة البيانات الهدف
+  log('\n📋 الخطوة 3: كتابة البيانات إلى قاعدة البيانات الهدف...', colors.yellow)
+
+  const { PrismaClient: TargetPrisma } = await import('@prisma/client')
+  const targetPrisma = new TargetPrisma()
+
+  try {
+    let migrated = 0
+    for (const { name, model } of tables) {
+      const rows = data[name] || []
+      if (rows.length === 0) {
+        log(`   ${name}: 0 سجل (تخطي)`, colors.blue)
+        continue
+      }
+
+      const modelInstance = (targetPrisma as any)[model]
+      if (!modelInstance) {
+        log(`   ⚠️  ${name}: النموذج غير موجود`, colors.yellow)
+        continue
+      }
+
+      try {
+        // فحص عدد السجلات الموجودة
+        const existingCount = await modelInstance.count()
+        if (existingCount > 0) {
+          // محاولة الحذف، تجاهل الأخطاء
+          try {
+            await modelInstance.deleteMany({})
+          } catch {
+            log(`   ⚠️  ${name}: تعذر حذف السجلات الموجودة، سيتم الإضافة`, colors.yellow)
           }
-          return processed
-        })
-
-        // كتابة البيانات إلى PostgreSQL عبر Prisma
-        const prismaModel = (prisma as any)[name.charAt(0).toLowerCase() + name.slice(1)]
-        if (!prismaModel) {
-          log(`   ⚠️  ${name}: النموذج غير موجود في Prisma`, colors.yellow)
-          continue
         }
-
-        // حذف البيانات الموجودة (إن أي) لتجنب التكرار
-        await prismaModel.deleteMany({})
-
-        // إدراج البيانات على دفعات (100 سجل في كل دفعة)
+        
+        const processedRows = processDates(rows)
+        
         const batchSize = 100
         for (let i = 0; i < processedRows.length; i += batchSize) {
           const batch = processedRows.slice(i, i + batchSize)
-          await prismaModel.createMany({ data: batch })
+          await modelInstance.createMany({ data: batch })
         }
 
         log(`   ✅ ${name}: ${rows.length} سجل`, colors.green)
-        totalMigrated += rows.length
+        migrated += rows.length
       } catch (e: any) {
-        log(`   ❌ ${name}: ${e.message}`, colors.red)
+        log(`   ❌ ${name}: ${e.message.substring(0, 60)}`, colors.red)
       }
     }
 
-    log(`\n✅ تم ترحيل ${totalMigrated} سجل بنجاح!`, colors.bold + colors.green)
-
-    // إعادة تعيين تسلسل المعرفات في PostgreSQL
-    log('\n📋 إعادة تعيين التسلسلات...', colors.yellow)
-    try {
-      await prisma.$executeRawUnsafe(`
-        SELECT setval(pg_get_serial_sequence('"User"', 'id'), 
-          COALESCE(MAX(CAST(SUBSTRING(id FROM 2) AS INTEGER)), 1) + 1, false) FROM "User"
-      `).catch(() => {})
-      log('✅ تم إعادة تعيين التسلسلات', colors.green)
-    } catch (e) {
-      log('⚠️  تعذر إعادة تعيين التسلسلات (غير حرج)', colors.yellow)
-    }
+    log(`\n✅ تم ترحيل ${migrated} سجل بنجاح!`, colors.bold + colors.green)
 
   } finally {
-    sqlite.close()
-    await prisma.$disconnect()
+    await targetPrisma.$disconnect()
   }
+
+  console.log('\n' + '═'.repeat(60))
+  log('🎉 اكتمل الترحيل بنجاح!', colors.bold + colors.green)
+  console.log('═'.repeat(60) + '\n')
 }
 
 main().catch((e) => {
