@@ -17,7 +17,10 @@
     "audit": "bun run scripts/audit-stats.ts",
     "start:all": "bun run scripts/start-all.ts",
     "stop": "bun run scripts/stop.ts",
-    "install:shortcut": "bun run scripts/install-desktop-shortcut.ts"
+    "install:shortcut": "bun run scripts/install-desktop-shortcut.ts",
+    "setup:postgres": "bun run scripts/setup-postgres.ts",
+    "migrate:postgres": "bun run scripts/migrate-to-postgres.ts",
+    "switch-db": "bun run scripts/switch-db.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

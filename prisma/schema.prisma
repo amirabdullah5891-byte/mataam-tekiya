@@ -1,20 +1,26 @@
 // Prisma schema for Restaurant Accounting System
 // نظام حسابات مطعم التكية - أبو أمنة الشعبي
 //
-// لدعم PostgreSQL في الإنتاج:
-// 1. غيّر provider من "sqlite" إلى "postgresql"
+// ====== دعم المزودات ======
+// المزود الافتراضي يُحدد عبر متغير البيئة DATABASE_PROVIDER
+// - sqlite: للتطوير (افتراضي)
+// - postgresql: للإنتاج والتوسع الكبير
+// - mysql: بديل للإنتاج
+//
+// للتبديل إلى PostgreSQL:
+// 1. ثبّت PostgreSQL محلياً أو استخدم خدمة سحابية (Neon, Supabase)
 // 2. حدّث DATABASE_URL في .env إلى رابط PostgreSQL
 //    مثال: postgresql://user:pass@host:5432/dbname?schema=public
-// 3. شغّل: bun run db:push
-//
-// مزودات مدعومة: sqlite (تطوير), postgresql (إنتاج), mysql
+// 3. شغّل: bun run setup:postgres (للإعداد التلقائي + الترحيل)
+// أو يدوياً:
+//    - DATABASE_PROVIDER=postgresql bun run db:push
+//    - bun run migrate:postgres (لترحيل البيانات الموجودة)
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  // استخدم "postgresql" في الإنتاج للإداء العالي والتوسع الأفقي
   provider = "sqlite"
   url      = env("DATABASE_URL")
 }
