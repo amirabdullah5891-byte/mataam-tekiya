@@ -192,66 +192,83 @@ export default function CustomerOrders({ user }: { user: AppUser }) {
             </div>
           ) : (
             <ScrollArea className="max-h-[600px]">
-              <div className="space-y-3 p-4">
-                {orders.map(order => (
-                  <div
-                    key={order.id}
-                    className="border rounded-lg p-4 hover:shadow-sm transition-shadow"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono font-bold text-sm">{order.orderNumber}</span>
-                          {statusBadge(order.status)}
+              <div className="space-y-4 p-4">
+                {orders.map(order => {
+                  const statusInfo = STATUS_FLOW.find(x => x.id === order.status)
+                  return (
+                    <div
+                      key={order.id}
+                      className="border-r-4 rounded-lg p-4 hover:shadow-md transition-all bg-card"
+                      style={{ borderRightColor: statusInfo ? '' : 'transparent' }}
+                    >
+                      {/* رأس البطاقة */}
+                      <div className="flex flex-wrap items-start justify-between gap-3 mb-3 pb-3 border-b">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full ${statusInfo?.color || 'bg-gray-500'} text-white flex items-center justify-center flex-shrink-0`}>
+                            {statusInfo?.icon}
+                          </div>
+                          <div>
+                            <span className="font-mono font-bold text-sm block">{order.orderNumber}</span>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDateTime(order.createdAt)}
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {formatDateTime(order.createdAt)}
-                        </p>
+                        <div className="text-left flex flex-col items-end gap-1">
+                          <p className="font-bold text-primary text-xl">
+                            {formatCurrency(order.total)}
+                          </p>
+                          <Badge variant="outline" className="text-xs">
+                            {order.paymentMethod === 'wallet' ? (
+                              <><Wallet className="h-3 w-3 ml-1" /> محفظة</>
+                            ) : (
+                              <><Receipt className="h-3 w-3 ml-1" /> نقداً</>
+                            )}
+                          </Badge>
+                        </div>
                       </div>
-                      <div className="text-left">
-                        <p className="font-bold text-primary text-lg">
-                          {formatCurrency(order.total)}
-                        </p>
-                        <Badge variant="outline" className="text-xs">
-                          {order.paymentMethod === 'wallet' ? (
-                            <><Wallet className="h-3 w-3 ml-1" /> محفظة</>
-                          ) : (
-                            <><Receipt className="h-3 w-3 ml-1" /> نقداً</>
-                          )}
-                        </Badge>
-                      </div>
-                    </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm mb-3">
-                      {order.customerName && (
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <User className="h-3.5 w-3.5" />
-                          <span>{order.customerName}</span>
-                        </div>
-                      )}
-                      {order.customerPhone && (
-                        <div className="flex items-center gap-1 text-muted-foreground" dir="ltr">
-                          <Phone className="h-3.5 w-3.5" />
-                          <span>{order.customerPhone}</span>
-                        </div>
-                      )}
-                      {order.tableNumber && (
-                        <div className="flex items-center gap-1 text-muted-foreground">
+                      {/* معلومات الزبون */}
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm mb-3 p-2 bg-muted/30 rounded-lg">
+                        {order.customerName && (
+                          <div className="flex items-center gap-1.5">
+                            <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                            <span className="font-medium">{order.customerName}</span>
+                          </div>
+                        )}
+                        {order.customerPhone && (
+                          <div className="flex items-center gap-1.5" dir="ltr">
+                            <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                            <span className="font-mono">{order.customerPhone}</span>
+                          </div>
+                        )}
+                        {order.tableNumber && (
+                          <div className="flex items-center gap-1.5">
+                            <ShoppingCart className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                            <span className="font-medium">طاولة {order.tableNumber}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* البنود */}
+                      <div className="mb-3 p-3 bg-muted/20 rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
                           <ShoppingCart className="h-3.5 w-3.5" />
-                          <span>طاولة {order.tableNumber}</span>
+                          البنود ({order.items.length})
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {order.items.map((it, idx) => (
+                            <span key={idx} className="inline-flex items-center gap-1 bg-card border px-2 py-1 rounded-md text-xs">
+                              <span className="font-medium">{it.name}</span>
+                              <span className="bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 text-[10px] font-bold">
+                                ×{it.quantity}
+                              </span>
+                            </span>
+                          ))}
                         </div>
-                      )}
-                    </div>
+                      </div>
 
-                    {/* معاينة البنود */}
-                    <div className="text-sm mb-3">
-                      <p className="text-muted-foreground text-xs mb-1">البنود ({order.items.length}):</p>
-                      <p className="line-clamp-2">
-                        {order.items.map(it => `${it.name} ×${it.quantity}`).join('، ')}
-                      </p>
-                    </div>
-
-                    {/* أزرار الإجراء */}
+                      {/* أزرار الإجراء */}
                     <div className="flex flex-wrap gap-2">
                       <Button
                         size="sm"
@@ -312,7 +329,8 @@ export default function CustomerOrders({ user }: { user: AppUser }) {
                       )}
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             </ScrollArea>
           )}

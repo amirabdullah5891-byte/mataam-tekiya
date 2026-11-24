@@ -413,15 +413,15 @@ function StatCard({
   }[tone]
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden hover:shadow-md transition-shadow">
       <CardContent className="p-5">
-        <div className="flex items-start justify-between">
-          <div className="space-y-1 min-w-0">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1 min-w-0 flex-1">
             <p className="text-sm text-muted-foreground">{title}</p>
             <p className="text-xl md:text-2xl font-bold truncate">{value}</p>
-            {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+            {subtitle && <p className="text-xs text-muted-foreground line-clamp-1">{subtitle}</p>}
           </div>
-          <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${toneClasses}`}>
+          <div className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center shadow-sm ${toneClasses}`}>
             {icon}
           </div>
         </div>

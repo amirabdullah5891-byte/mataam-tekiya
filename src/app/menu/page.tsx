@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   ShoppingCart, Search, Plus, Minus, X, Loader2, Utensils,
   MapPin, Phone, CheckCircle2, Wallet, ArrowLeft, Star, Bell,
-  ImageOff, MessageSquare, AlertCircle, RefreshCw,
+  MessageSquare, AlertCircle, RefreshCw,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,6 +22,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { toast } from 'sonner'
 import { formatCurrency } from '@/lib/format'
 import { RESTAURANT_INFO } from '@/lib/restaurant'
+import { getDishImage, getCategoryIcon, getCategoryColor } from '@/lib/dish-images'
 
 type MenuItem = {
   id: string
@@ -362,25 +363,30 @@ export default function MenuPage() {
               className="pr-9"
             />
           </div>
-          {/* فئات أفقية */}
-          <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
+          {/* فئات أفقية - محسّنة بالأيقونات */}
+          <div className="flex gap-2 mt-3 overflow-x-auto pb-2 scrollbar-thin">
             <button
               onClick={() => setActiveCategory('all')}
-              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                activeCategory === 'all' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+              className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                activeCategory === 'all'
+                  ? 'bg-primary text-primary-foreground shadow-md scale-105'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
               }`}
             >
-              الكل
+              🍽️ الكل
             </button>
             {categories.map(cat => (
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                  activeCategory === cat ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-1 ${
+                  activeCategory === cat
+                    ? 'bg-primary text-primary-foreground shadow-md scale-105'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
                 }`}
               >
-                {cat}
+                <span>{getCategoryIcon(cat)}</span>
+                <span>{cat}</span>
               </button>
             ))}
           </div>
@@ -408,12 +414,17 @@ export default function MenuPage() {
             <p>لا توجد أصناف متاحة</p>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-8">
             {activeCategory === 'all' ? (
               Object.entries(grouped).map(([category, catItems]) => (
                 <section key={category}>
-                  <h2 className="text-lg font-bold mb-3 px-1">{category}</h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="flex items-center gap-2 mb-4 px-1">
+                    <span className="text-2xl">{getCategoryIcon(category)}</span>
+                    <h2 className="text-xl font-bold">{category}</h2>
+                    <span className="text-sm text-muted-foreground">({catItems.length})</span>
+                    <div className="flex-1 h-px bg-border mr-2"></div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {catItems.map(item => (
                       <MenuItemCard
                         key={item.id}
@@ -428,8 +439,13 @@ export default function MenuPage() {
               ))
             ) : (
               <section>
-                <h2 className="text-lg font-bold mb-3 px-1">{activeCategory}</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="flex items-center gap-2 mb-4 px-1">
+                  <span className="text-2xl">{getCategoryIcon(activeCategory)}</span>
+                  <h2 className="text-xl font-bold">{activeCategory}</h2>
+                  <span className="text-sm text-muted-foreground">({filteredItems.length})</span>
+                  <div className="flex-1 h-px bg-border mr-2"></div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredItems.map(item => (
                     <MenuItemCard
                       key={item.id}
@@ -871,89 +887,102 @@ function MenuItemCard({
   onViewReviews: (item: MenuItem) => void
   onAddReview: (item: MenuItem) => void
 }) {
+  const dishImage = getDishImage(item.imageUrl, item.category)
+  const categoryIcon = getCategoryIcon(item.category)
+
   return (
-    <Card className={`overflow-hidden ${!item.isAvailable ? 'opacity-60' : ''}`}>
+    <Card className={`overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 ${!item.isAvailable ? 'opacity-60' : ''}`}>
       {/* صورة الطبق */}
-      {item.imageUrl ? (
-        <div className="aspect-video bg-muted overflow-hidden">
-          { }
-          <img
-            src={item.imageUrl}
-            alt={item.name}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              const target = e.currentTarget
-              target.style.display = 'none'
-            }}
-          />
+      <div className="aspect-video bg-muted overflow-hidden relative group">
+        <img
+          src={dishImage}
+          alt={item.name}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          onError={(e) => {
+            const target = e.currentTarget
+            target.style.display = 'none'
+          }}
+        />
+        {/* أيقونة الفئة في الزاوية */}
+        <div className="absolute top-2 right-2 bg-black/50 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full">
+          {categoryIcon} {item.category}
         </div>
-      ) : (
-        <div className="aspect-video bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center">
-          <ImageOff className="h-10 w-10 text-muted-foreground/40" />
-        </div>
-      )}
+        {/* شارة "غير متاح" */}
+        {!item.isAvailable && (
+          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+            <span className="bg-red-600 text-white text-sm font-bold px-3 py-1 rounded-full">
+              غير متاح حالياً
+            </span>
+          </div>
+        )}
+        {/* شارة وقت التحضير */}
+        {item.prepTime && (
+          <div className="absolute bottom-2 left-2 bg-black/50 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
+            ⏱ {item.prepTime} د
+          </div>
+        )}
+      </div>
 
       <CardContent className="p-4">
-        <div className="flex items-start gap-3">
-          <div className="flex-1 min-w-0">
-            <h4 className="font-semibold mb-1">{item.name}</h4>
-            {item.description && (
-              <p className="text-xs text-muted-foreground mb-2 line-clamp-2">{item.description}</p>
-            )}
-            <div className="flex items-center gap-2 flex-wrap mb-2">
-              <p className="text-primary font-bold">{formatCurrency(item.price)}</p>
-              {item.prepTime && (
-                <Badge variant="outline" className="text-xs">
-                  {item.prepTime} دقيقة
-                </Badge>
-              )}
-              {!item.isAvailable && (
-                <Badge variant="destructive" className="text-xs">غير متاح</Badge>
-              )}
+        {/* اسم الطبق */}
+        <h4 className="font-bold text-base mb-1 line-clamp-1">{item.name}</h4>
+        
+        {/* الوصف */}
+        {item.description && (
+          <p className="text-xs text-muted-foreground mb-3 line-clamp-2 min-h-[2rem]">
+            {item.description}
+          </p>
+        )}
+
+        {/* التقييم */}
+        {item.totalReviews > 0 ? (
+          <button
+            onClick={() => onViewReviews(item)}
+            className="flex items-center gap-1.5 mb-3 text-xs hover:underline"
+          >
+            <div className="flex items-center gap-0.5">
+              {[1, 2, 3, 4, 5].map(n => (
+                <Star
+                  key={n}
+                  className={`h-3.5 w-3.5 ${
+                    n <= Math.round(item.avgRating)
+                      ? 'fill-amber-500 text-amber-500'
+                      : 'text-muted-foreground'
+                  }`}
+                />
+              ))}
             </div>
+            <span className="font-bold">{item.avgRating}</span>
+            <span className="text-muted-foreground">({item.totalReviews})</span>
+          </button>
+        ) : (
+          <div className="mb-3 text-xs text-muted-foreground">لا توجد تقييمات بعد</div>
+        )}
 
-            {/* التقييم */}
-            {item.totalReviews > 0 && (
-              <button
-                onClick={() => onViewReviews(item)}
-                className="flex items-center gap-1 text-xs hover:underline"
-              >
-                <div className="flex items-center gap-0.5">
-                  {[1, 2, 3, 4, 5].map(n => (
-                    <Star
-                      key={n}
-                      className={`h-3 w-3 ${
-                        n <= Math.round(item.avgRating)
-                          ? 'fill-amber-500 text-amber-500'
-                          : 'text-muted-foreground'
-                      }`}
-                    />
-                  ))}
-                </div>
-                <span className="font-bold">{item.avgRating}</span>
-                <span className="text-muted-foreground">({item.totalReviews})</span>
-              </button>
-            )}
+        {/* السعر والأزرار */}
+        <div className="flex items-center justify-between gap-2 pt-2 border-t">
+          <div>
+            <p className="text-lg font-bold text-primary">{formatCurrency(item.price)}</p>
           </div>
-        </div>
-
-        {/* أزرار */}
-        <div className="flex gap-2 mt-3">
-          <Button
-            size="sm"
-            onClick={() => onAdd(item)}
-            disabled={!item.isAvailable}
-            className="flex-1"
-          >
-            <Plus className="h-4 w-4 ml-1" /> إضافة
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onAddReview(item)}
-          >
-            <Star className="h-4 w-4" />
-          </Button>
+          <div className="flex gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => onAddReview(item)}
+              className="px-2"
+              title="إضافة تقييم"
+            >
+              <Star className="h-4 w-4" />
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => onAdd(item)}
+              disabled={!item.isAvailable}
+              className="px-4"
+            >
+              <Plus className="h-4 w-4 ml-1" /> إضافة
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
