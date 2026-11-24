@@ -1,5 +1,6 @@
 'use client'
 import { apiFetch } from '@/lib/api-client'
+import { ALL_PERMISSIONS, JOB_TITLES, parsePermissions } from '@/lib/permissions'
 
 import { useEffect, useState, useCallback } from 'react'
 import {
@@ -38,9 +39,11 @@ type UserRow = {
   username: string
   name: string
   role: string
+  jobTitle: string | null
   isActive: boolean
   lastLogin: string | null
   createdAt: string
+  permissions: string | null
 }
 
 const ROLES = [
@@ -168,6 +171,9 @@ export default function UsersManagement({ currentUser }: { currentUser: AppUser 
                             </div>
                             <div>
                               <p>{u.name}</p>
+                              {u.jobTitle && (
+                                <p className="text-xs text-muted-foreground">{u.jobTitle}</p>
+                              )}
                               {isCurrentUser && (
                                 <span className="text-xs text-primary">(أنت)</span>
                               )}
@@ -267,6 +273,9 @@ function UserDialog({
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState('cashier')
+  const [jobTitle, setJobTitle] = useState('')
+  const [permissions, setPermissions] = useState<Record<string, boolean>>({})
+  const [showPermissions, setShowPermissions] = useState(false)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -275,9 +284,17 @@ function UserDialog({
         setName(user.name)
         setUsername(user.username)
         setRole(user.role)
+        setJobTitle(user.jobTitle || '')
         setPassword('')
+        // تحميل الصلاحيات
+        try {
+          setPermissions(parsePermissions(user.permissions, user.role))
+        } catch {
+          setPermissions({})
+        }
       } else {
-        setName(''); setUsername(''); setRole('cashier'); setPassword('')
+        setName(''); setUsername(''); setRole('cashier'); setJobTitle(''); setPassword('')
+        setPermissions({})
       }
     }
   }, [open, user])
@@ -298,15 +315,12 @@ function UserDialog({
     }
     setSaving(true)
     try {
-      const body: {
-        name: string
-        username: string
-        role: string
-        password?: string
-      } = {
+      const body: any = {
         name: name.trim(),
         username: username.trim(),
         role,
+        jobTitle: jobTitle.trim() || undefined,
+        permissions,
       }
       if (password) body.password = password
 
@@ -331,9 +345,13 @@ function UserDialog({
     }
   }
 
+  const togglePermission = (key: string) => {
+    setPermissions(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{user ? 'تعديل مستخدم' : 'إضافة مستخدم جديد'}</DialogTitle>
           <DialogDescription>
@@ -356,18 +374,33 @@ function UserDialog({
               dir="ltr"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">
-              كلمة المرور {user && '(اتركها فارغة لعدم التغيير)'} {!user && '*'}
-            </Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="6 أحرف على الأقل"
-              required={!user}
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="password">
+                كلمة المرور {user && '(اتركها فارغة)'} {!user && '*'}
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="6 أحرف على الأقل"
+                required={!user}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="jobTitle">المسمى الوظيفي</Label>
+              <Input
+                id="jobTitle"
+                value={jobTitle}
+                onChange={(e) => setJobTitle(e.target.value)}
+                placeholder="مثال: كاشير، شيف، ويتر"
+                list="job-titles"
+              />
+              <datalist id="job-titles">
+                {JOB_TITLES.map(t => <option key={t} value={t} />)}
+              </datalist>
+            </div>
           </div>
           <div className="space-y-2">
             <Label>الدور *</Label>
@@ -385,11 +418,41 @@ function UserDialog({
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground mt-1">
-              {role === 'admin' && 'صلاحيات كاملة: إدارة المستخدمين، الفواتير، المشتريات، المخزون، المصروفات، التقارير'}
-              {role === 'manager' && 'صلاحيات إدارية: الفواتير، المشتريات، المخزون، المصروفات، التقارير'}
-              {role === 'cashier' && 'صلاحيات محدودة: الفواتير والعرض فقط'}
+              {role === 'admin' && 'صلاحيات كاملة (يمكن تخصيصها أدناه)'}
+              {role === 'manager' && 'صلاحيات إدارية (يمكن تخصيصها أدناه)'}
+              {role === 'cashier' && 'صلاحيات محدودة (يمكن تخصيصها أدناه)'}
             </p>
           </div>
+
+          {/* الصلاحيات التفصيلية */}
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => setShowPermissions(!showPermissions)}
+              className="w-full flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+            >
+              <span className="text-sm font-medium">🔧 ضبط الصلاحيات التفصيلية</span>
+              <span className="text-xs text-muted-foreground">{showPermissions ? 'إخفاء' : 'عرض'}</span>
+            </button>
+            {showPermissions && (
+              <div className="space-y-2 p-3 border rounded-lg max-h-[300px] overflow-y-auto">
+                {ALL_PERMISSIONS.map(perm => (
+                  <div key={perm.key} className="flex items-center justify-between p-2 rounded hover:bg-muted/50">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">{perm.label}</p>
+                      <p className="text-xs text-muted-foreground">{perm.description}</p>
+                    </div>
+                    <Switch
+                      checked={permissions[perm.key] === true}
+                      onCheckedChange={() => togglePermission(perm.key)}
+                      disabled={perm.key === 'users' && role !== 'admin'}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>إلغاء</Button>
             <Button type="submit" disabled={saving}>

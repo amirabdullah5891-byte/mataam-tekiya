@@ -27,15 +27,19 @@ datasource db {
 
 // المستخدمون - نظام تسجيل دخول متعدد المستخدمين
 model User {
-  id        String   @id @default(cuid())
-  username  String   @unique
-  password  String   // مشفرة باستخدام scrypt
-  name      String
-  role      String   @default("cashier") // admin, manager, cashier
-  isActive  Boolean  @default(true)
-  lastLogin DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  username    String   @unique
+  password    String   // مشفرة باستخدام scrypt
+  name        String
+  role        String   @default("cashier") // admin, manager, cashier
+  jobTitle    String?  // المسمى الوظيفي (مدير عام، محاسب، كاشير، ويتر، شيف، إلخ)
+  isActive    Boolean  @default(true)
+  // الصلاحيات التفصيلية (JSON string)
+  // مثال: {"invoices":true,"purchases":true,"inventory":false,"expenses":false,"suppliers":false,"reports":true,"users":false,"customerOrders":true,"customers":true,"reviews":false,"audit":false,"menu":false}
+  permissions String?
+  lastLogin   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   expenses           Expense[]
   purchases          Purchase[]

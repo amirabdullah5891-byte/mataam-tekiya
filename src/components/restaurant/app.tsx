@@ -33,6 +33,8 @@ export type AppUser = {
   username: string
   name: string
   role: string
+  jobTitle: string | null
+  permissions: Record<string, boolean>
 }
 
 type Tab =
@@ -148,9 +150,13 @@ function SidebarContent({ user, tab, onSelectTab, onSignOut }: SidebarContentPro
         </div>
 
         {NAV_SECTIONS.map(section => {
-          const visibleItems = section.items.filter(
-            item => !item.adminOnly || user.role === 'admin'
-          )
+          const visibleItems = section.items.filter(item => {
+            // adminOnly: فقط للمدير
+            if (item.adminOnly && user.role !== 'admin') return false
+            // فحص الصلاحيات
+            if (user.permissions && user.permissions[item.id] === false) return false
+            return true
+          })
           if (visibleItems.length === 0) return null
           return (
             <div key={section.title}>
@@ -187,9 +193,11 @@ function SidebarContent({ user, tab, onSelectTab, onSignOut }: SidebarContentPro
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{user.name}</p>
-            <Badge variant="secondary" className="text-xs">
-              {roleLabel[user.role] || user.role}
-            </Badge>
+            <div className="flex items-center gap-1 flex-wrap">
+              <Badge variant="secondary" className="text-xs">
+                {user.jobTitle || roleLabel[user.role] || user.role}
+              </Badge>
+            </div>
           </div>
         </div>
         <Button

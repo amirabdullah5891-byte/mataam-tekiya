@@ -16,9 +16,11 @@ export async function GET(request: NextRequest) {
         username: true,
         name: true,
         role: true,
+        jobTitle: true,
         isActive: true,
         lastLogin: true,
         createdAt: true,
+        permissions: true,
       },
       orderBy: { createdAt: 'asc' },
     })
@@ -38,7 +40,7 @@ export async function POST(request: NextRequest) {
     if (user.role !== 'admin') return forbiddenResponse()
 
     const body = await request.json()
-    const { name, username, password, role } = body
+    const { name, username, password, role, jobTitle, permissions } = body
 
     if (!name || !username || !password) {
       return NextResponse.json(
@@ -65,21 +67,31 @@ export async function POST(request: NextRequest) {
     }
 
     const { hashPassword } = await import('@/lib/password')
+    const { serializePermissions, getDefaultPermissions } = await import('@/lib/permissions')
+
+    const userRole = role || 'cashier'
+    const userPermissions = permissions
+      ? serializePermissions(permissions)
+      : serializePermissions(getDefaultPermissions(userRole))
 
     const newUser = await db.user.create({
       data: {
         name: name.trim(),
         username: username.trim(),
         password: hashPassword(password),
-        role: role || 'cashier',
+        role: userRole,
+        jobTitle: jobTitle?.trim() || null,
+        permissions: userPermissions,
       },
       select: {
         id: true,
         name: true,
         username: true,
         role: true,
+        jobTitle: true,
         isActive: true,
         createdAt: true,
+        permissions: true,
       },
     })
 

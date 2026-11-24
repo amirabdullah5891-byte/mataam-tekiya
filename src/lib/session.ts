@@ -19,6 +19,8 @@ export type SessionUser = {
   username: string
   name: string
   role: string
+  jobTitle: string | null
+  permissions: Record<string, boolean>
 }
 
 // إنشاء جلسة جديدة للمستخدم - تُرجع الـ token
@@ -84,7 +86,7 @@ export async function getSessionUser(request: Request): Promise<SessionUser | nu
       where: { token },
       include: {
         user: {
-          select: { id: true, username: true, name: true, role: true, isActive: true },
+          select: { id: true, username: true, name: true, role: true, isActive: true, jobTitle: true, permissions: true },
         },
       },
     })
@@ -104,11 +106,17 @@ export async function getSessionUser(request: Request): Promise<SessionUser | nu
       return null
     }
 
+    // استيراد نظام الصلاحيات
+    const { parsePermissions } = await import('./permissions')
+    const permissions = parsePermissions(session.user.permissions, session.user.role)
+
     return {
       id: session.user.id,
       username: session.user.username,
       name: session.user.name,
       role: session.user.role,
+      jobTitle: session.user.jobTitle,
+      permissions,
     }
   } catch (e) {
     console.error('getSessionUser error:', e)

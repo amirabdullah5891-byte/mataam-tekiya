@@ -15,7 +15,7 @@ export async function PUT(
 
     const { id } = await params
     const body = await request.json()
-    const { name, username, password, role, isActive } = body
+    const { name, username, password, role, isActive, jobTitle, permissions } = body
 
     const existing = await db.user.findUnique({ where: { id } })
     if (!existing) {
@@ -34,6 +34,8 @@ export async function PUT(
       username?: string
       password?: string
       role?: string
+      jobTitle?: string | null
+      permissions?: string
       isActive?: boolean
     } = {}
 
@@ -55,7 +57,12 @@ export async function PUT(
       }
       data.role = role
     }
+    if (jobTitle !== undefined) data.jobTitle = jobTitle?.trim() || null
     if (isActive !== undefined) data.isActive = Boolean(isActive)
+    if (permissions !== undefined) {
+      const { serializePermissions } = await import('@/lib/permissions')
+      data.permissions = serializePermissions(permissions)
+    }
 
     const updated = await db.user.update({
       where: { id },
@@ -65,8 +72,10 @@ export async function PUT(
         name: true,
         username: true,
         role: true,
+        jobTitle: true,
         isActive: true,
         createdAt: true,
+        permissions: true,
       },
     })
 
