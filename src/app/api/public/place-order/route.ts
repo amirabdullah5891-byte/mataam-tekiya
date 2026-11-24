@@ -43,6 +43,9 @@ export async function POST(request: NextRequest) {
       items,
       paymentMethod = 'cash',
       notes,
+      orderType = 'dine_in', // dine_in (داخل المحل), takeaway (سفري)
+      waiterName, // اسم الويتر/الكاشير
+      address, // عنوان التوصيل للسفري
     } = body
 
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -50,6 +53,22 @@ export async function POST(request: NextRequest) {
         { error: 'الطلب يجب أن يحتوي على بند واحد على الأقل' },
         { status: 400 }
       )
+    }
+
+    // التحقق من البيانات المطلوبة حسب نوع الطلب
+    if (orderType === 'takeaway') {
+      if (!customerPhone?.trim()) {
+        return NextResponse.json(
+          { error: 'رقم الهاتف مطلوب للطلبات السفرية' },
+          { status: 400 }
+        )
+      }
+      if (!address?.trim()) {
+        return NextResponse.json(
+          { error: 'العنوان مطلوب للطلبات السفرية' },
+          { status: 400 }
+        )
+      }
     }
 
     // التحقق من أن العناصر موجودة في القائمة
@@ -85,6 +104,8 @@ export async function POST(request: NextRequest) {
 
     const subtotal = orderItemsData.reduce((s, it) => s + it.total, 0)
     const total = subtotal
+    // حساب عدد الأطباق الإجمالي
+    const itemCount = orderItemsData.reduce((s, it) => s + it.quantity, 0)
 
     // البحث عن زبون مسجل برقم الهاتف (إن وُجد)
     let customer: { id: string; balance: number } | null = null
@@ -131,6 +152,10 @@ export async function POST(request: NextRequest) {
           paymentMethod,
           status: 'pending',
           notes: notes?.trim() || null,
+          orderType,
+          waiterName: waiterName?.trim() || null,
+          address: address?.trim() || null,
+          itemCount,
           items: { create: orderItemsData },
         },
         include: { items: true },

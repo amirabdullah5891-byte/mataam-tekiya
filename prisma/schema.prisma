@@ -294,7 +294,7 @@ model WalletTransaction {
   @@index([type])
 }
 
-// طلبات الزبائن - الطلبات المرسلة عبر واجهة المنيو
+// طلبات الزبائن - الطلبات المرسلة عبر واجهة المنيو أو الكاشير
 model CustomerOrder {
   id              String              @id @default(cuid())
   orderNumber     String              @unique
@@ -302,7 +302,7 @@ model CustomerOrder {
   customer        Customer?           @relation(fields: [customerId], references: [id])
   customerName    String?             // اسم الزبون (قد لا يكون مسجلاً)
   customerPhone   String?             // هاتف الزبون
-  tableNumber     String?             // رقم الطاولة
+  tableNumber     String?             // رقم الطاولة (للطلبات داخل المحل)
   items           CustomerOrderItem[]
   subtotal        Float               @default(0)
   deliveryFee     Float               @default(0)
@@ -310,6 +310,11 @@ model CustomerOrder {
   paymentMethod   String              @default("cash") // cash, wallet
   status          String              @default("pending") // pending, confirmed, preparing, ready, completed, cancelled
   notes           String?
+  // حقول نوع الطلب
+  orderType       String              @default("dine_in") // dine_in (داخل المحل), takeaway (سفري)
+  waiterName      String?             // اسم الويتر/الكاشير معد الطلب
+  address         String?             // عنوان التوصيل (للطلبات السفرية)
+  itemCount       Int                 @default(0) // إجمالي عدد الأطباق (للسفري)
   acceptedById    String?
   acceptedBy      User?               @relation(fields: [acceptedById], references: [id])
   acceptedAt      DateTime?

@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+/* eslint-disable @typescript-eslint/no-require-imports */
 // سكريبت ترحيل مبسط: يقرأ من SQLite مباشرة، ويكتب لـ PostgreSQL عبر Prisma
 import { PrismaClient } from '@prisma/client'
 import { existsSync, readFileSync, writeFileSync } from 'fs'

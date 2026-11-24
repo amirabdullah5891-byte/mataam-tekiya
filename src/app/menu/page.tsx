@@ -81,6 +81,10 @@ export default function MenuPage() {
   const [tableNumber, setTableNumber] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'wallet'>('cash')
   const [notes, setNotes] = useState('')
+  // حقول نوع الطلب
+  const [orderType, setOrderType] = useState<'dine_in' | 'takeaway'>('dine_in')
+  const [waiterName, setWaiterName] = useState('')
+  const [address, setAddress] = useState('')
 
   // التقييمات
   const [reviewsOpen, setReviewsOpen] = useState<MenuItem | null>(null)
@@ -204,6 +208,17 @@ export default function MenuPage() {
       toast.error('يجب إدخال رقم الهاتف للدفع من المحفظة')
       return
     }
+    // التحقق من بيانات السفري
+    if (orderType === 'takeaway') {
+      if (!customerPhone.trim()) {
+        toast.error('رقم الهاتف مطلوب للطلبات السفرية')
+        return
+      }
+      if (!address.trim()) {
+        toast.error('العنوان مطلوب للطلبات السفرية')
+        return
+      }
+    }
     setSubmitting(true)
     try {
       const res = await fetch('/api/public/place-order', {
@@ -216,6 +231,9 @@ export default function MenuPage() {
           items: cart,
           paymentMethod,
           notes: notes.trim(),
+          orderType,
+          waiterName: waiterName.trim(),
+          address: address.trim(),
         }),
       })
       const json = await res.json()
@@ -226,7 +244,9 @@ export default function MenuPage() {
       setCart([])
       setCheckoutOpen(false)
       setCustomerName(''); setTableNumber(''); setNotes('')
+      setWaiterName(''); setAddress('')
       setPaymentMethod('cash')
+      setOrderType('dine_in')
       toast.success(json.message)
     } catch (e: any) {
       toast.error(e.message || 'فشل في إرسال الطلب')
@@ -548,6 +568,37 @@ export default function MenuPage() {
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* اختيار نوع الطلب */}
+            <div className="space-y-2">
+              <Label>نوع الطلب</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setOrderType('dine_in')}
+                  className={`p-3 rounded-lg border-2 transition-all ${
+                    orderType === 'dine_in' ? 'border-primary bg-primary/10' : 'border-border'
+                  }`}
+                >
+                  <div className="text-center">
+                    <p className="text-2xl mb-1">🍽️</p>
+                    <p className="text-sm font-medium">داخل المحل</p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOrderType('takeaway')}
+                  className={`p-3 rounded-lg border-2 transition-all ${
+                    orderType === 'takeaway' ? 'border-primary bg-primary/10' : 'border-border'
+                  }`}
+                >
+                  <div className="text-center">
+                    <p className="text-2xl mb-1">🛍️</p>
+                    <p className="text-sm font-medium">سفري</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="customerName">الاسم</Label>
               <Input
@@ -579,13 +630,41 @@ export default function MenuPage() {
               )}
             </div>
 
+            {/* رقم الطاولة - فقط للطلبات داخل المحل */}
+            {orderType === 'dine_in' && (
+              <div className="space-y-2">
+                <Label htmlFor="tableNumber">رقم الطاولة</Label>
+                <Input
+                  id="tableNumber"
+                  value={tableNumber}
+                  onChange={(e) => setTableNumber(e.target.value)}
+                  placeholder="مثال: 5"
+                />
+              </div>
+            )}
+
+            {/* العنوان - فقط للطلبات السفرية */}
+            {orderType === 'takeaway' && (
+              <div className="space-y-2">
+                <Label htmlFor="address">عنوان التوصيل *</Label>
+                <Input
+                  id="address"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="مثال: الكلاكلة اللفة - شارع 7 - منزل رقم 12"
+                  required
+                />
+              </div>
+            )}
+
+            {/* اسم الويتر - اختياري */}
             <div className="space-y-2">
-              <Label htmlFor="tableNumber">رقم الطاولة (إن وجد)</Label>
+              <Label htmlFor="waiterName">اسم الويتر/الكاشير (اختياري)</Label>
               <Input
-                id="tableNumber"
-                value={tableNumber}
-                onChange={(e) => setTableNumber(e.target.value)}
-                placeholder="مثال: 5"
+                id="waiterName"
+                value={waiterName}
+                onChange={(e) => setWaiterName(e.target.value)}
+                placeholder="اسم معد الطلب"
               />
             </div>
 

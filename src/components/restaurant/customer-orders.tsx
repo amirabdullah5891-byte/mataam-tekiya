@@ -4,7 +4,7 @@ import { apiFetch } from '@/lib/api-client'
 import { useEffect, useState, useCallback } from 'react'
 import {
   Bell, Loader2, Eye, CheckCircle2, Clock, ChefHat, Package,
-  XCircle, ShoppingCart, User, Phone, Wallet, Receipt,
+  XCircle, ShoppingCart, User, Phone, Wallet, Receipt, MapPin,
 } from 'lucide-react'
 import {
   Card, CardContent, CardHeader, CardTitle, CardDescription,
@@ -49,6 +49,10 @@ type CustomerOrder = {
   total: number
   paymentMethod: string
   status: string
+  orderType: string | null
+  waiterName: string | null
+  address: string | null
+  itemCount: number
   notes: string | null
   acceptedBy: { name: string } | null
   acceptedAt: string | null
@@ -228,6 +232,24 @@ export default function CustomerOrders({ user }: { user: AppUser }) {
                         </div>
                       </div>
 
+                      {/* شارة نوع الطلب */}
+                      <div className="mb-3 flex flex-wrap gap-2">
+                        <Badge className={`${order.orderType === 'takeaway' ? 'bg-purple-600' : 'bg-emerald-600'} text-white`}>
+                          {order.orderType === 'takeaway' ? '🛍️ سفري' : '🍽️ داخل المحل'}
+                        </Badge>
+                        {order.waiterName && (
+                          <Badge variant="outline" className="text-xs">
+                            <User className="h-3 w-3 ml-1" />
+                            الويتر: {order.waiterName}
+                          </Badge>
+                        )}
+                        {order.itemCount > 0 && (
+                          <Badge variant="secondary" className="text-xs">
+                            {order.itemCount} طبق
+                          </Badge>
+                        )}
+                      </div>
+
                       {/* معلومات الزبون */}
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm mb-3 p-2 bg-muted/30 rounded-lg">
                         {order.customerName && (
@@ -242,10 +264,16 @@ export default function CustomerOrders({ user }: { user: AppUser }) {
                             <span className="font-mono">{order.customerPhone}</span>
                           </div>
                         )}
-                        {order.tableNumber && (
+                        {order.orderType === 'dine_in' && order.tableNumber && (
                           <div className="flex items-center gap-1.5">
                             <ShoppingCart className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                             <span className="font-medium">طاولة {order.tableNumber}</span>
+                          </div>
+                        )}
+                        {order.orderType === 'takeaway' && order.address && (
+                          <div className="flex items-start gap-1.5 col-span-2 md:col-span-3">
+                            <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                            <span className="font-medium text-sm">{order.address}</span>
                           </div>
                         )}
                       </div>
