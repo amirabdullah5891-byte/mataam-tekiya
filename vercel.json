@@ -1,0 +1,13 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "bun run build",
+  "installCommand": "bun install",
+  "env": {
+    "NEXT_PUBLIC_APP_NAME": "مطعم التكية"
+  },
+  "functions": {
+    "src/app/api/**/*.ts": {
+      "maxDuration": 30
+    }
+  }
+}

@@ -6,12 +6,14 @@ node_modules/
 out/
 dist/
 
-# Environment
+# Environment (لا ترفع لـ GitHub!)
 .env
 .env.local
 .env.production
+.env.sqlite.backup
 
-# Database (نسخ احتياطية)
+# Database
+db/
 backups/
 
 # Logs
@@ -32,3 +34,10 @@ Thumbs.db
 # Temporary
 tmp/
 temp/
+
+# Upload
+upload/
+migration-data.json
+
+# Vercel
+.vercel
