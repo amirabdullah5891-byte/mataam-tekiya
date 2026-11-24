@@ -4,7 +4,8 @@ import { apiFetch } from '@/lib/api-client'
 import { useEffect, useState, useCallback } from 'react'
 import {
   BarChart3, Download, Loader2, TrendingUp, Receipt, Coins,
-  ShoppingBag, Calendar as CalendarIcon,
+  ShoppingBag, Calendar as CalendarIcon, Boxes, Truck, Wallet,
+  AlertTriangle, Upload,
 } from 'lucide-react'
 import {
   Card, CardContent, CardHeader, CardTitle, CardDescription,
@@ -17,6 +18,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, PieChart, Pie, Cell, Legend,
@@ -415,6 +417,32 @@ export default function Reports() {
           )}
         </CardContent>
       </Card>
+
+      {/* تبويبات التقارير الإضافية */}
+      <Tabs defaultValue="sales" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="sales">المبيعات</TabsTrigger>
+          <TabsTrigger value="inventory">المخزون</TabsTrigger>
+          <TabsTrigger value="suppliers">الموردون</TabsTrigger>
+          <TabsTrigger value="expenses">المصروفات</TabsTrigger>
+        </TabsList>
+        <TabsContent value="sales">
+          <Card>
+            <CardContent className="p-4 text-center text-sm text-muted-foreground">
+              تقارير المبيعات معروضة في الأعلى ↑
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="inventory">
+          <InventoryReport />
+        </TabsContent>
+        <TabsContent value="suppliers">
+          <SuppliersReport />
+        </TabsContent>
+        <TabsContent value="expenses">
+          <ExpensesReport />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
@@ -450,5 +478,263 @@ function SummaryCard({
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+// ===== تقرير المخزون =====
+function InventoryReport() {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await apiFetch('/api/reports/inventory')
+      const json = await res.json()
+      setData(json)
+    } catch {
+      setData(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchData() }, [fetchData])
+
+  if (loading) return <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+  if (!data) return <Card><CardContent className="py-8 text-center text-muted-foreground">فشل في تحميل التقرير</CardContent></Card>
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <SummaryCard title="إجمالي الأصناف" value={formatNumber(data.summary.totalItems)} icon={<Boxes className="h-5 w-5" />} tone="primary" />
+        <SummaryCard title="قيمة المخزون" value={formatCurrency(data.summary.totalValue)} icon={<TrendingUp className="h-5 w-5" />} tone="success" />
+        <SummaryCard title="أصناف منخفضة" value={formatNumber(data.summary.lowStockCount)} icon={<AlertTriangle className="h-5 w-5" />} tone="destructive" />
+        <SummaryCard title="الفئات" value={formatNumber(data.summary.categories)} icon={<BarChart3 className="h-5 w-5" />} tone="muted" />
+      </div>
+
+      {data.lowStockItems.length > 0 && (
+        <Card className="border-amber-300">
+          <CardHeader><CardTitle className="text-base flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-500" /> تنبيهات المخزون المنخفض</CardTitle></CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {data.lowStockItems.map((item: any, i: number) => (
+                <Badge key={i} variant="destructive">{item.name}: {item.quantity} {item.unit}</Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">قيمة المخزون حسب الفئة</CardTitle></CardHeader>
+        <CardContent>
+          <div className="h-64" dir="ltr">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data.categoryStats}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="category" fontSize={11} />
+                <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} fontSize={11} />
+                <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={{ direction: 'rtl', borderRadius: '8px' }} />
+                <Bar dataKey="value" fill="#d97706" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">تفاصيل الأصناف</CardTitle></CardHeader>
+        <CardContent className="p-0">
+          <ScrollArea className="max-h-[400px]">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-right">الصنف</TableHead>
+                  <TableHead className="text-right">الفئة</TableHead>
+                  <TableHead className="text-center">الكمية</TableHead>
+                  <TableHead className="text-center">التكلفة</TableHead>
+                  <TableHead className="text-left">القيمة</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.items.map((item: any) => (
+                  <TableRow key={item.id} className={item.isLowStock ? 'bg-amber-50' : ''}>
+                    <TableCell className="font-medium">{item.name}</TableCell>
+                    <TableCell className="text-sm">{item.category}</TableCell>
+                    <TableCell className="text-center">{item.quantity} {item.unit}</TableCell>
+                    <TableCell className="text-center">{formatCurrency(item.costPerUnit)}</TableCell>
+                    <TableCell className="text-left font-semibold">{formatCurrency(item.totalValue)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// ===== تقرير الموردين =====
+function SuppliersReport() {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await apiFetch('/api/reports/suppliers')
+      const json = await res.json()
+      setData(json)
+    } catch {
+      setData(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchData() }, [fetchData])
+
+  if (loading) return <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+  if (!data) return <Card><CardContent className="py-8 text-center text-muted-foreground">فشل في تحميل التقرير</CardContent></Card>
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <SummaryCard title="عدد الموردين" value={formatNumber(data.summary.totalSuppliers)} icon={<Truck className="h-5 w-5" />} tone="primary" />
+        <SummaryCard title="إجمالي المستحقات" value={formatCurrency(data.summary.totalBalance)} icon={<Wallet className="h-5 w-5" />} tone="destructive" />
+        <SummaryCard title="عدد المشتريات" value={formatNumber(data.summary.totalPurchases)} icon={<ShoppingBag className="h-5 w-5" />} tone="accent" />
+        <SummaryCard title="قيمة المشتريات" value={formatCurrency(data.summary.totalPurchaseValue)} icon={<TrendingUp className="h-5 w-5" />} tone="muted" />
+      </div>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">تفاصيل الموردين</CardTitle></CardHeader>
+        <CardContent className="p-0">
+          <ScrollArea className="max-h-[500px]">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-right">المورد</TableHead>
+                  <TableHead className="text-right hidden sm:table-cell">الهاتف</TableHead>
+                  <TableHead className="text-center">المشتريات</TableHead>
+                  <TableHead className="text-left">القيمة</TableHead>
+                  <TableHead className="text-left">المستحقات</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.suppliers.map((sup: any) => (
+                  <TableRow key={sup.id}>
+                    <TableCell className="font-medium">{sup.name}</TableCell>
+                    <TableCell className="hidden sm:table-cell font-mono text-sm" dir="ltr">{sup.phone || '—'}</TableCell>
+                    <TableCell className="text-center">{sup.totalPurchases}</TableCell>
+                    <TableCell className="text-left">{formatCurrency(sup.purchaseValue)}</TableCell>
+                    <TableCell className="text-left">
+                      {sup.balance > 0 ? (
+                        <Badge variant="destructive">{formatCurrency(sup.balance)}</Badge>
+                      ) : (
+                        <Badge variant="secondary">مسدد</Badge>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// ===== تقرير المصروفات =====
+function ExpensesReport() {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  const today = new Date()
+  const monthAgo = new Date(today)
+  monthAgo.setMonth(monthAgo.getMonth() - 1)
+  const [from, setFrom] = useState(monthAgo.toISOString().slice(0, 10))
+  const [to, setTo] = useState(today.toISOString().slice(0, 10))
+
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await apiFetch(`/api/reports/expenses?from=${from}&to=${to}`)
+      const json = await res.json()
+      setData(json)
+    } catch {
+      setData(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [from, to])
+
+  useEffect(() => { fetchData() }, [fetchData])
+
+  if (loading) return <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+  if (!data) return <Card><CardContent className="py-8 text-center text-muted-foreground">فشل في تحميل التقرير</CardContent></Card>
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-40" />
+        <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-40" />
+        <Button variant="outline" size="sm" onClick={fetchData}><Download className="h-4 w-4" /></Button>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <SummaryCard title="إجمالي المصروفات" value={formatCurrency(data.summary.total)} icon={<Wallet className="h-5 w-5" />} tone="destructive" />
+        <SummaryCard title="عدد المصروفات" value={formatNumber(data.summary.count)} icon={<Receipt className="h-5 w-5" />} tone="accent" />
+        <SummaryCard title="متوسط المصروف" value={formatCurrency(data.summary.avgExpense)} icon={<TrendingUp className="h-5 w-5" />} tone="muted" />
+        <SummaryCard title="الفئات" value={formatNumber(data.summary.categories)} icon={<BarChart3 className="h-5 w-5" />} tone="primary" />
+      </div>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">المصروفات حسب الفئة</CardTitle></CardHeader>
+        <CardContent>
+          <div className="h-64" dir="ltr">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data.byCategory}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="category" fontSize={11} />
+                <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} fontSize={11} />
+                <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={{ direction: 'rtl', borderRadius: '8px' }} />
+                <Bar dataKey="total" fill="#dc2626" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">تفاصيل المصروفات</CardTitle></CardHeader>
+        <CardContent className="p-0">
+          <ScrollArea className="max-h-[400px]">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-right">الفئة</TableHead>
+                  <TableHead className="text-right hidden md:table-cell">الوصف</TableHead>
+                  <TableHead className="text-right">التاريخ</TableHead>
+                  <TableHead className="text-left">المبلغ</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.expenses.map((e: any) => (
+                  <TableRow key={e.id}>
+                    <TableCell><Badge variant="outline">{e.category}</Badge></TableCell>
+                    <TableCell className="hidden md:table-cell text-sm">{e.description || '—'}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{formatDate(e.date)}</TableCell>
+                    <TableCell className="text-left font-semibold text-destructive">{formatCurrency(e.amount)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
