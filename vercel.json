@@ -2,6 +2,7 @@
   "framework": "nextjs",
   "buildCommand": "bun run build",
   "installCommand": "bun install",
+  "nodeVersion": "20.x",
   "env": {
     "NEXT_PUBLIC_APP_NAME": "مطعم التكية"
   },
