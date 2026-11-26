@@ -7,9 +7,7 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  // ملاحظة: خيار eslint أُزيل لأنه غير مدعوم في Next.js 16
   images: {
     remotePatterns: [
       {
